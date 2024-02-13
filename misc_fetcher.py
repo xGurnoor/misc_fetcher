@@ -35,12 +35,15 @@ parser = argparse.ArgumentParser(
     epilog="APIs for the win"
 )
 
-parser.add_argument('username')
 parser.add_argument('-H', '--human', 
                     action="store_true", help='shows data in human readable numbers')
+parser.add_argument('-u', '--username', help="The username to serach", nargs=argparse.REMAINDER)
 
 args = parser.parse_args()
 username = args.username
+if not username:
+    parser.print_help()
+    sys.exit()
 
 with open("tokens.json", 'r', encoding="UTF-8") as f:
     tokens = json.load(f)
