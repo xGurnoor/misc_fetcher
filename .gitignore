@@ -3,3 +3,9 @@ apks
 testing
 tokens.json
 techtree.sqlite
+test.py
+.gitignore
+techtree copy.sqlite
+profile_test.json
+login_test.json
+login_test_2.json

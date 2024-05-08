@@ -35,9 +35,10 @@ parser = argparse.ArgumentParser(
     epilog="APIs for the win"
 )
 
-parser.add_argument('-H', '--human', 
+parser.add_argument('-H', '--human',
                     action="store_true", help='shows data in human readable numbers')
-parser.add_argument('-u', '--username', help="The username to serach", nargs=argparse.REMAINDER)
+parser.add_argument('-u', '--username',
+                    help="The username to serach", nargs=argparse.REMAINDER)
 
 args = parser.parse_args()
 username = args.username
@@ -51,6 +52,7 @@ with open("tokens.json", 'r', encoding="UTF-8") as f:
 ACCESS_TOKEN = tokens['access_token']
 REFERSH_TOKEN = tokens['refresh_token']
 EXCEPTION_COUNTER = {"count": 0}
+
 
 def get_profile(token, profile_name):
     """Gets the profile data by username"""
@@ -68,7 +70,8 @@ def get_profile(token, profile_name):
             sys.exit(3)
 
         EXCEPTION_COUNTER['count'] += 1
-        print(f'{EXCEPTION_COUNTER["count"]}: Session expired. Fetching new token and retrying...')
+        print(
+            f'{EXCEPTION_COUNTER["count"]}: Session expired. Fetching new token and retrying...')
         new_token = update_access_token()
         return get_profile(new_token, profile_name)
     elif "Username doesn't exist" in ex:
@@ -87,7 +90,8 @@ def update_access_token():
         json.dump(tokens, fp, indent=4)
     return new_token
 
-def get_access_token():
+
+def get_access_token(resp=False):
     """Fetchs new access token"""
     url = "https://api.partyinmydorm.com/game/login/oauth/"
     payload = {
@@ -99,13 +103,54 @@ def get_access_token():
         "version": "3137",
         "client_secret": "n0ts0s3cr3t",
         "grant_type": "refresh_token",
-        "client_information": 
-         # pylint: disable=line-too-long
+        "client_information":
+        # pylint: disable=line-too-long
         "{\"android_advertising\":\"002cca36-c10a-4217-829c-78d383a279a5\",\"android_id\":\"fd744b22575e3de1\",\"app_set_id\":\"a443de33-41a2-45a0-9c30-2669a012b6c2\",\"bundle_id\":\"ata.squid.pimd\",\"country\":\"US\",\"dpi\":\"xxhdpi\",\"ether_map\":{\"1\":\"02:00:00:00:00:00\"},\"hardware_version\":\"google|Android SDK built for x86\",\"language\":\"en\",\"limit_ad_tracking\":false,\"locale\":\"en_US\",\"os_build\":\"Build\\/QSR1.190920.001\",\"os_name\":\"Android\",\"os_version\":\"10\",\"referrer\":\"utm_source=google-play&utm_medium=organic\",\"screen_size\":\"screen_normal\",\"user_agent\":\"Mozilla\\/5.0 (Linux; Android 10; Android SDK built for x86 Build\\/QSR1.190920.001; wv) AppleWebKit\\/537.36 (KHTML, like Gecko) Version\\/4.0 Chrome\\/74.0.3729.185 Mobile Safari\\/537.36\",\"version_name\":\"7.00\"}"
     }
 
     r = requests.post(url, payload, timeout=400)
+    # json.dump(r.json(), open('login_test.json', 'w'), indent=2)
+    # exit()
+    if resp:
+        rsp = r.json()
+        return [rsp, rsp['access_token']]
+
     return r.json()['access_token']
+
+
+def refetch(techtree):
+    """Refetches new misc items and add to techtree"""
+    rsp = get_access_token(True)
+    new_token = rsp[1]
+    tokens['access_token'] = new_token
+    with open('tokens.json', 'w', encoding='UTF-8') as fp:
+        json.dump(tokens, fp, indent=4)
+
+    db = sqlite3.connect('techtree.sqlite')
+    cur = db.cursor()
+
+    resp = rsp[0]
+    items = resp['new_items']
+    for item in items:
+        if techtree.get(item['id']):
+            continue
+
+        id_ = item['id']
+        desc = item['description']
+        name = item['name']
+        base_id = item.get('base_id', 0)
+        att_ = item.get('attack', 0)
+        int_att = item.get('spy_attack', 0)
+        per = item.get('percentage', 0)
+        optionals_json = json.dumps(
+            {"attack": att_, "spy_attack": int_att, "percentage": per})
+
+        cur.execute(
+            'INSERT INTO counterunit (id, optionals_json, base_id, name, description) VALUES (?, ?, ?, ?, ?)', [id_, optionals_json, base_id, name, desc])
+    cur.close()
+    db.commit()
+    db.close()
+
 
 def build_techtree():
     """Builds the TechTree from SQLite DB and stores in a dict"""
@@ -128,6 +173,7 @@ def build_techtree():
 
     return temp_tree
 
+
 def calculate(stats_, techtree_):
     """Do the calculation"""
 
@@ -138,7 +184,12 @@ def calculate(stats_, techtree_):
     total_def_per = 0
 
     for stat in stats_:
-        item = techtree_[stat['id']]
+        item = techtree_.get(stat['id'])
+        if not item:
+            print(f"Item ID: {
+                  stat['id']} not present in TechTree DB. Refetching.")
+            refetch(techtree_)
+            sys.exit(0)
         if item['base_id']:
             continue
         is_per = item.get('percentage')
@@ -156,7 +207,8 @@ def calculate(stats_, techtree_):
         total_def,
         total_att_per,
         total_def_per
-        )
+    )
+
 
 def convert_to_human(i: int):
     """Converts given long numbers into human readable"""
@@ -173,9 +225,11 @@ def convert_to_human(i: int):
     return i
 
 
-
 if __name__ == "__main__":
+
     profile = get_profile(ACCESS_TOKEN, username)
+    # json.dump(profile, open("test.json", "w"), indent=2)
+    # exit()
     showcase = profile.get('showcase')
     if not showcase:
         print('No showcase present in profile?')
