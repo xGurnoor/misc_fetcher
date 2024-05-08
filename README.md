@@ -26,7 +26,7 @@ You'll need a `tokens.json` file in the same directory filled with the `refresh_
 and run
 
 ```bash
-python misc_fetcher.py <username>
+python misc_fetcher.py -Hu <username>
 ```
 
 ```bash
@@ -40,6 +40,8 @@ positional arguments:
 optional arguments:
   -h, --help   show this help message and exit
   -H, --human  shows data in human readable numbers
+  -u ..., --username ...
+                        The username to serach
 
 APIs for the win
 ```
