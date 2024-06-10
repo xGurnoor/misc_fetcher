@@ -107,7 +107,7 @@ def get_access_token(resp=False):
         # pylint: disable=line-too-long
         "{\"android_advertising\":\"002cca36-c10a-4217-829c-78d383a279a5\",\"android_id\":\"fd744b22575e3de1\",\"app_set_id\":\"a443de33-41a2-45a0-9c30-2669a012b6c2\",\"bundle_id\":\"ata.squid.pimd\",\"country\":\"US\",\"dpi\":\"xxhdpi\",\"ether_map\":{\"1\":\"02:00:00:00:00:00\"},\"hardware_version\":\"google|Android SDK built for x86\",\"language\":\"en\",\"limit_ad_tracking\":false,\"locale\":\"en_US\",\"os_build\":\"Build\\/QSR1.190920.001\",\"os_name\":\"Android\",\"os_version\":\"10\",\"referrer\":\"utm_source=google-play&utm_medium=organic\",\"screen_size\":\"screen_normal\",\"user_agent\":\"Mozilla\\/5.0 (Linux; Android 10; Android SDK built for x86 Build\\/QSR1.190920.001; wv) AppleWebKit\\/537.36 (KHTML, like Gecko) Version\\/4.0 Chrome\\/74.0.3729.185 Mobile Safari\\/537.36\",\"version_name\":\"7.00\"}"
     }
-
+    # print('sending request')
     r = requests.post(url, payload, timeout=400)
     # json.dump(r.json(), open('login_test.json', 'w'), indent=2)
     # exit()
