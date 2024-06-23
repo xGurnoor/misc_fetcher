@@ -23,11 +23,12 @@
 """Script to get and calculate misc"""
 import sys
 import json
-import sqlite3
+import os
 import argparse
+import time
 import requests
 
-from prettytable import PrettyTable
+from discord import Embed, SyncWebhook, Color
 
 parser = argparse.ArgumentParser(
     prog="MiscFetcher",
@@ -35,23 +36,44 @@ parser = argparse.ArgumentParser(
     epilog="APIs for the win"
 )
 
-parser.add_argument('-H', '--human',
-                    action="store_true", help='shows data in human readable numbers')
-parser.add_argument('-u', '--username',
-                    help="The username to serach", nargs=argparse.REMAINDER)
+
+parser.add_argument('-l', '--list',
+                    help="The list to use", default="allies.json", nargs=argparse.REMAINDER)
+
 
 args = parser.parse_args()
-username = args.username
-if not username:
-    parser.print_help()
-    sys.exit()
+if isinstance(args.list, list):
+    args.list = ' '.join(args.list)
+if args.list.strip() == '':
+    print('Provide a value for \'list\' parameter.')
+    exit(3)
 
 with open("tokens.json", 'r', encoding="UTF-8") as f:
     tokens = json.load(f)
 
+if not os.path.exists('allies.json'):
+    with open('allies.json', 'w', encoding='utf-8') as fp:
+        t = {"usernames": []}
+        json.dump(t, fp)
+
+with open('allies.json', 'r', encoding='utf-8') as fp:
+    ALLIES = json.load(fp)
+
+if not ALLIES:
+    print("allies.json is empty.")
+    sys.exit(4)
+
+if not os.path.exists('tut_list.json'):
+    with open('tut_list.json', 'w', encoding='utf-8') as fp:
+        fp.write('{}')
+with open('tut_list.json', 'r', encoding='utf-8') as fp:
+    TUT_LIST = json.load(fp)
+
 ACCESS_TOKEN = tokens['access_token']
 REFERSH_TOKEN = tokens['refresh_token']
+WEBHOOK_URL = tokens['discord_webhook_url']
 EXCEPTION_COUNTER = {"count": 0}
+STOP = False
 
 
 def get_profile(token, profile_name):
@@ -60,9 +82,6 @@ def get_profile(token, profile_name):
     r = requests.post(url, data={"profile_username": profile_name}, timeout=400, headers={
         "Authorization": f"Bearer {token}", "user-agent": "pimddroid/526"})
     res = r.json()
-    fp = open('testing/new_prof.json', 'w', encoding='utf-8')
-    json.dump(res, fp, indent=2)
-    fp.close()
     ex = res.get('exception')
     if not ex:
         return res
@@ -89,8 +108,8 @@ def update_access_token():
     """Tries to update the access token"""
     new_token = get_access_token()
     tokens['access_token'] = new_token
-    with open('tokens.json', 'w', encoding='UTF-8') as fp:
-        json.dump(tokens, fp, indent=4)
+    with open('tokens.json', 'w', encoding='UTF-8') as tokens_fp:
+        json.dump(tokens, tokens_fp, indent=4)
     return new_token
 
 
@@ -110,107 +129,12 @@ def get_access_token(resp=False):
         # pylint: disable=line-too-long
         "{\"android_advertising\":\"002cca36-c10a-4217-829c-78d383a279a5\",\"android_id\":\"fd744b22575e3de1\",\"app_set_id\":\"a443de33-41a2-45a0-9c30-2669a012b6c2\",\"bundle_id\":\"ata.squid.pimd\",\"country\":\"US\",\"dpi\":\"xxhdpi\",\"ether_map\":{\"1\":\"02:00:00:00:00:00\"},\"hardware_version\":\"google|Android SDK built for x86\",\"language\":\"en\",\"limit_ad_tracking\":false,\"locale\":\"en_US\",\"os_build\":\"Build\\/QSR1.190920.001\",\"os_name\":\"Android\",\"os_version\":\"10\",\"referrer\":\"utm_source=google-play&utm_medium=organic\",\"screen_size\":\"screen_normal\",\"user_agent\":\"Mozilla\\/5.0 (Linux; Android 10; Android SDK built for x86 Build\\/QSR1.190920.001; wv) AppleWebKit\\/537.36 (KHTML, like Gecko) Version\\/4.0 Chrome\\/74.0.3729.185 Mobile Safari\\/537.36\",\"version_name\":\"7.00\"}"
     }
-    # print('sending request')
     r = requests.post(url, payload, timeout=400)
-    # json.dump(r.json(), open('login_test.json', 'w'), indent=2)
-    # exit()
     if resp:
         rsp = r.json()
         return [rsp, rsp['access_token']]
 
     return r.json()['access_token']
-
-
-def refetch(techtree):
-    """Refetches new misc items and add to techtree"""
-    rsp = get_access_token(True)
-    new_token = rsp[1]
-    tokens['access_token'] = new_token
-    with open('tokens.json', 'w', encoding='UTF-8') as fp:
-        json.dump(tokens, fp, indent=4)
-
-    db = sqlite3.connect('techtree.sqlite')
-    cur = db.cursor()
-
-    resp = rsp[0]
-    items = resp['new_items']
-    for item in items:
-        if techtree.get(item['id']):
-            continue
-
-        id_ = item['id']
-        desc = item['description']
-        name = item['name']
-        base_id = item.get('base_id', 0)
-        att_ = item.get('attack', 0)
-        int_att = item.get('spy_attack', 0)
-        per = item.get('percentage', 0)
-        optionals_json = json.dumps(
-            {"attack": att_, "spy_attack": int_att, "percentage": per})
-
-        cur.execute(
-            'INSERT INTO counterunit (id, optionals_json, base_id, name, description) VALUES (?, ?, ?, ?, ?)', [id_, optionals_json, base_id, name, desc])
-    cur.close()
-    db.commit()
-    db.close()
-
-
-def build_techtree():
-    """Builds the TechTree from SQLite DB and stores in a dict"""
-    temp_tree = {}
-
-    db = sqlite3.connect('techtree.sqlite')
-
-    cur = db.cursor()
-    res = cur.execute(
-        'SELECT id, optionals_json, base_id FROM counterunit')
-
-    result = res.fetchall()
-
-    cur.close()
-    db.close()
-
-    for x in result:
-        temp_tree[x[0]] = json.loads(x[1])
-        temp_tree[x[0]]['base_id'] = x[2]
-
-    return temp_tree
-
-
-def calculate(stats_, techtree_):
-    """Do the calculation"""
-
-    total_att = 0
-    total_def = 0
-
-    total_att_per = 0
-    total_def_per = 0
-
-    for stat in stats_:
-        item = techtree_.get(stat['id'])
-        if not item:
-            print(f"Item ID: {
-                  stat['id']} not present in TechTree DB. Refetching.")
-            refetch(techtree_)
-            sys.exit(0)
-        if item['base_id']:
-            continue
-        is_per = item.get('percentage')
-        if is_per is None:
-            continue
-        if is_per:
-            total_att_per += item.get('attack', 0) * stat.get("count")
-            total_def_per += item.get('spy_attack', 0) * stat.get("count")
-        else:
-            total_att += item.get('attack', 0) * stat.get("count")
-            total_def += item.get('spy_attack', 0) * stat.get("count")
-
-    return (
-        total_att,
-        total_def,
-        total_att_per,
-        total_def_per
-    )
 
 
 def convert_to_human(i: int):
@@ -228,24 +152,67 @@ def convert_to_human(i: int):
     return i
 
 
+def check_tuts():
+    """Checks the tutors for strips for all allies."""
+    for username in ALLIES['usernames']:
+        profile = get_profile(ACCESS_TOKEN, username)
+        # json.dump(profile, open("test.json", "w"), indent=2)
+        # exit()
+        temp = profile.get('clan_members')
+        tutors = []
+        for x in temp:
+            tut = {'user_id': x['user_id'], 'username': x['username']}
+            tutors.append(tut)
+        # print(f"IGN: {username}: \n", json.dumps(tutors, indent=2))
+        old_list = TUT_LIST.get(username)
+        if not old_list:
+            TUT_LIST[username] = tutors
+            with open('tut_list.json', 'w', encoding='utf-8') as tut_list_fp:
+                json.dump(TUT_LIST, tut_list_fp, indent=2)
+        else:
+            temp1 = []
+            for x in tutors:
+                temp1.append(x['username'])
+
+            temp2 = []
+            for x in old_list:
+                temp2.append(x['username'])
+            missing = set(temp2).difference(temp1)
+            added = set(temp1).difference(temp2)
+            if missing or added:
+
+                TUT_LIST[username] = tutors
+                with open('tut_list.json', 'w', encoding='utf-8') as tut_list_fp:
+                    json.dump(TUT_LIST, tut_list_fp, indent=2)
+
+                alert_server(username, list(missing), list(added))
+        time.sleep(2)
+
+
+def alert_server(person, missing=None, added=None):
+    """Inform the server of someone missing a tutor in tutor list."""
+    embed = Embed(title="Some retard got stripped",
+                  description="GET REKT LOL", color=Color.blurple())
+    embed.add_field(name="The retard", value=person)
+    if missing:
+        missing = [f"`{x}`" for x in missing]
+        embed.add_field(name="Tutors missing",
+                        value=", ".join(missing), inline=False)
+    if added:
+        added = [f"`{x}`" for x in added]
+        embed.add_field(name="New tutors hired",
+                        value=", ".join(added), inline=False)
+    wh = SyncWebhook.from_url(WEBHOOK_URL)
+    wh.send(content="@everyone", embed=embed)
+
+
 if __name__ == "__main__":
-
-    profile = get_profile(ACCESS_TOKEN, username)
-    # json.dump(profile, open("test.json", "w"), indent=2)
-    # exit()
-    showcase = profile.get('showcase')
-    if not showcase:
-        print('No showcase present in profile?')
-        sys.exit(5)
-
-    tech_tree = build_techtree()
-    att, defen, att_per, defen_per, = calculate(showcase, tech_tree)
-
-    t = PrettyTable(['Str', 'Int', 'Total', 'Str%', 'Int%'])
-    total = att + defen
-    if args.human:
-        att = convert_to_human(att)
-        defen = convert_to_human(defen)
-        total = convert_to_human(total)
-    t.add_row([att, defen, f"{total}cs", f"{att_per}%", f"{defen_per}%"])
-    print(t)
+    try:
+        print('Starting tutor checker.')
+        while not STOP:
+            print('Checking tutors.')
+            check_tuts()
+            time.sleep(30 * 60)
+    except KeyboardInterrupt:
+        print('Exiting...')
+        sys.exit(0)
