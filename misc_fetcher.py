@@ -37,11 +37,15 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument('-H', '--human',
                     action="store_true", help='shows data in human readable numbers')
+parser.add_argument('-s', '--stacks',
+                    action="store_true", help="If you want stacks to be saved to file.")
+parser.add_argument('-c', '--count',
+                    type=int, default=2, help="What count of misc is cut to be included in stacks")
 parser.add_argument('-u', '--username',
                     help="The username to serach", nargs=argparse.REMAINDER)
 
 args = parser.parse_args()
-username = args.username
+username = args.username[0]
 if not username:
     parser.print_help()
     sys.exit()
@@ -52,6 +56,8 @@ with open("tokens.json", 'r', encoding="UTF-8") as f:
 ACCESS_TOKEN = tokens['access_token']
 REFERSH_TOKEN = tokens['refresh_token']
 EXCEPTION_COUNTER = {"count": 0}
+CLIENT_INFORMATION = json.dumps(tokens['client_information'])
+STACK_LIST = []
 
 
 def get_profile(token, profile_name):
@@ -60,9 +66,9 @@ def get_profile(token, profile_name):
     r = requests.post(url, data={"profile_username": profile_name}, timeout=400, headers={
         "Authorization": f"Bearer {token}", "user-agent": "pimddroid/526"})
     res = r.json()
-    fp = open('testing/new_prof.json', 'w', encoding='utf-8')
-    json.dump(res, fp, indent=2)
-    fp.close()
+    # fp = open('testing/new_prof.json', 'w', encoding='utf-8')
+    # json.dump(res, fp, indent=2)
+    # fp.close()
     ex = res.get('exception')
     if not ex:
         return res
@@ -100,15 +106,13 @@ def get_access_token(resp=False):
     payload = {
         "channel_id": "16",
         "client_id": "ata.squid.pimd",
-        "client_version": "526",
+        "client_version": "534",
         "refresh_token": REFERSH_TOKEN,
         "scope": "[\"all\"]",
-        "version": "3137",
+        "version": "3320",
         "client_secret": "n0ts0s3cr3t",
         "grant_type": "refresh_token",
-        "client_information":
-        # pylint: disable=line-too-long
-        "{\"android_advertising\":\"002cca36-c10a-4217-829c-78d383a279a5\",\"android_id\":\"fd744b22575e3de1\",\"app_set_id\":\"a443de33-41a2-45a0-9c30-2669a012b6c2\",\"bundle_id\":\"ata.squid.pimd\",\"country\":\"US\",\"dpi\":\"xxhdpi\",\"ether_map\":{\"1\":\"02:00:00:00:00:00\"},\"hardware_version\":\"google|Android SDK built for x86\",\"language\":\"en\",\"limit_ad_tracking\":false,\"locale\":\"en_US\",\"os_build\":\"Build\\/QSR1.190920.001\",\"os_name\":\"Android\",\"os_version\":\"10\",\"referrer\":\"utm_source=google-play&utm_medium=organic\",\"screen_size\":\"screen_normal\",\"user_agent\":\"Mozilla\\/5.0 (Linux; Android 10; Android SDK built for x86 Build\\/QSR1.190920.001; wv) AppleWebKit\\/537.36 (KHTML, like Gecko) Version\\/4.0 Chrome\\/74.0.3729.185 Mobile Safari\\/537.36\",\"version_name\":\"7.00\"}"
+        "client_information": CLIENT_INFORMATION
     }
     # print('sending request')
     r = requests.post(url, payload, timeout=400)
@@ -123,19 +127,25 @@ def get_access_token(resp=False):
 
 def refetch(techtree):
     """Refetches new misc items and add to techtree"""
+    # print('start')
     rsp = get_access_token(True)
     new_token = rsp[1]
     tokens['access_token'] = new_token
     with open('tokens.json', 'w', encoding='UTF-8') as fp:
         json.dump(tokens, fp, indent=4)
-
     db = sqlite3.connect('techtree.sqlite')
     cur = db.cursor()
-
+    # print('open db')
     resp = rsp[0]
+    # json.dump(resp, open('debug.log.json', 'w'), indent=2)
     items = resp['new_items']
+    # print('starting loop')
+    # print('items: ', items)
+    # items = json.load(open('new_items.json', 'r'))['new_items']
     for item in items:
+        # print('in loop')
         if techtree.get(item['id']):
+            # print('id exists')
             continue
 
         id_ = item['id']
@@ -147,7 +157,6 @@ def refetch(techtree):
         per = item.get('percentage', 0)
         optionals_json = json.dumps(
             {"attack": att_, "spy_attack": int_att, "percentage": per})
-
         cur.execute(
             'INSERT INTO counterunit (id, optionals_json, base_id, name, description) VALUES (?, ?, ?, ?, ?)', [id_, optionals_json, base_id, name, desc])
     cur.close()
@@ -163,7 +172,7 @@ def build_techtree():
 
     cur = db.cursor()
     res = cur.execute(
-        'SELECT id, optionals_json, base_id FROM counterunit')
+        'SELECT id, optionals_json, base_id, name FROM counterunit')
 
     result = res.fetchall()
 
@@ -173,6 +182,7 @@ def build_techtree():
     for x in result:
         temp_tree[x[0]] = json.loads(x[1])
         temp_tree[x[0]]['base_id'] = x[2]
+        temp_tree[x[0]]['name'] = x[3]
 
     return temp_tree
 
@@ -189,21 +199,34 @@ def calculate(stats_, techtree_):
     for stat in stats_:
         item = techtree_.get(stat['id'])
         if not item:
-            print(f"Item ID: {
-                  stat['id']} not present in TechTree DB. Refetching.")
+            print("Item ID: "
+                  f"{stat['id']} not present in TechTree DB. Refetching.")
             refetch(techtree_)
+            # print('refetch done')
             sys.exit(0)
         if item['base_id']:
             continue
         is_per = item.get('percentage')
         if is_per is None:
             continue
+        if args.stacks:
+            if stat.get("count") > args.count and stat.get('count') < 251:
+
+                if item.get("name"):
+
+                    STACK_LIST.append(f"{stat['count']}: {item['name']}")
+
         if is_per:
             total_att_per += item.get('attack', 0) * stat.get("count")
             total_def_per += item.get('spy_attack', 0) * stat.get("count")
         else:
             total_att += item.get('attack', 0) * stat.get("count")
             total_def += item.get('spy_attack', 0) * stat.get("count")
+
+    if args.stacks:
+        # Save stack list to file with username.
+        with open(f"stacks/{username}.list", "w", encoding="utf-8") as stack_f:
+            stack_f.write("\n".join(STACK_LIST))
 
     return (
         total_att,
@@ -229,7 +252,6 @@ def convert_to_human(i: int):
 
 
 if __name__ == "__main__":
-
     profile = get_profile(ACCESS_TOKEN, username)
     # json.dump(profile, open("test.json", "w"), indent=2)
     # exit()

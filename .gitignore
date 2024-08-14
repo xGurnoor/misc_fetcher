@@ -11,3 +11,12 @@ login_test.json
 login_test_2.json
 tut_list.json
 allies.json
+server_only_tokens.json
+debug.log.json
+new_items.json
+techtree.old.sqlite
+pimd-pinning
+on_server
+on_server/misc_fetcher.py
+**/stacks/**
+**/stats/** 

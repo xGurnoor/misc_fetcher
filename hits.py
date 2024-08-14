@@ -34,7 +34,6 @@ def calculate(t, hits, per):
     """Calculates the actual cash lost"""
     lost = 0
     for _ in range(hits):
-        print(t, hits, per)
         loss = (per/100) * t
         lost += loss
         t -= loss
