@@ -247,7 +247,6 @@ def alert_mame_change(old, new):
 
 def check_tuts():
     """Checks the tutors for strips for all allies."""
-    update_list = False
     for ally in ALLIES:
         username = ally.get('username')
         uid = ally.get('profile_id')
@@ -271,7 +270,6 @@ def check_tuts():
 
                 ally.username = profile['username']
                 username = profile['username']
-                update_list = True
                 update_username(profile['username'], uid)
 
         tmp_stats = (profile.get('fights_lost'), profile.get('steals_lost'),
@@ -315,16 +313,6 @@ def check_tuts():
                     confirm_strip(missing, username, battle_sts)
 
         time.sleep(3)
-    if update_list:
-
-        cur = db.cursor()
-        cur.execute("SELECT * FROM allies")
-
-        r = cur.fetchall()
-        cur.close()
-
-        ALLIES.clear()
-        ALLIES.extend(r)
 
 
 def confirm_strip(missing, username, battle_sts):
@@ -441,6 +429,17 @@ def alert_server(person, missing=None, added=None, total=None):
     wh.send(content="<@&1273744969978613772>", embed=embed)
 
 
+def update_allies():
+    cur = db.cursor()
+    cur.execute("SELECT * FROM allies")
+
+    r = cur.fetchall()
+    cur.close()
+
+    ALLIES.clear()
+    ALLIES.extend(r)
+
+
 if __name__ == "__main__":
     try:
         print('Starting tutor checker.')
@@ -448,6 +447,7 @@ if __name__ == "__main__":
         while not STOP:
             print('Checking tutors.')
             check_tuts()
+            update_allies()
             time.sleep(10 * 60)
     except KeyboardInterrupt:
         STOP = True
