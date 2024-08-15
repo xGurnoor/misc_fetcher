@@ -229,6 +229,19 @@ def update_user_id(uid, username):
     cur.close()
 
 
+def update_username(name, uid):
+    """Update username in the database"""
+    cur = db.cursor()
+    cur.execute(
+        'UDPDATE allies SET username = ? WHERE profile_id = ?', (name, uid))
+
+
+def alert_mame_change(old, new):
+    """Alerts the server about a new name change"""
+    wh = SyncWebhook.from_url(WEBHOOK_URL)
+    wh.send(f"Ally changed name from `{old}` to `{new}`.")
+
+
 def check_tuts():
     """Checks the tutors for strips for all allies."""
     for ally in ALLIES:
@@ -244,6 +257,11 @@ def check_tuts():
             update_user_id(uid, username)
         else:
             profile = get_profile_by_id(ACCESS_TOKEN, uid)
+            if not profile['username'] == username:
+                alert_mame_change(username, profile['username'])
+                ally.username = profile['username']
+                username = profile['username']
+                update_username(profile['username'], uid)
 
         tmp_stats = (profile.get('fights_lost'), profile.get('steals_lost'),
                      profile.get('assassinates_lost'), profile.get('scouts_lost'))
