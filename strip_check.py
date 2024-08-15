@@ -144,10 +144,14 @@ def get_profile_by_id(token, profile_id):
 
 def get_profile(token, profile_name):
     """Gets the profile data by username"""
-    url = "https://api.partyinmydorm.com/game/user/get_profile_by_name/"
+    url = "https://api.partyinmydorm.com/game/user/get_profile_by_username/"
     r = requests.post(url, data={"profile_username": profile_name}, timeout=400, headers={
         "Authorization": f"Bearer {token}", "user-agent": "pimddroid/526"})
-    res = r.json()
+    try:
+        res = r.json()
+    except requests.exceptions.JSONDecodeError:
+        print("Error in decoding this: ", r.text)
+        return
     ex = res.get('exception')
     if not ex:
         return res
@@ -240,12 +244,11 @@ def check_tuts():
             update_user_id(uid, username)
         else:
             profile = get_profile_by_id(ACCESS_TOKEN, uid)
-        # json.dump(profile, open("test.json", "w"), indent=2)
-        # exit()
-        print(ally)
+
         tmp_stats = (profile.get('fights_lost'), profile.get('steals_lost'),
                      profile.get('assassinates_lost'), profile.get('scouts_lost'))
         battle_sts = BattleStats(*tmp_stats)
+
         tutors = []
 
         for x in profile.get('clan_members'):
@@ -346,7 +349,7 @@ def watch_fls(username, bsts):
             alert_fls(username, nochange=True)
             unchanged += 1
 
-        time.sleep(10 * 60)
+        time.sleep(10)
 
 
 def alert_fls(username, new_stats=None, prev_stats=None, nochange=False, stopping=False):
@@ -402,11 +405,11 @@ def alert_server(person, missing=None, added=None, total=None):
 if __name__ == "__main__":
     try:
         print('Starting tutor checker.')
+        setup_db()
         while not STOP:
-            setup_db()
             print('Checking tutors.')
             check_tuts()
-            time.sleep(10 * 60)
+            time.sleep(10)
     except KeyboardInterrupt:
         STOP = True
         print('Exiting...')
