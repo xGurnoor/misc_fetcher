@@ -231,36 +231,48 @@ def update_user_id(uid, username):
 
 def update_username(name, uid):
     """Update username in the database"""
+    print('updating name')
     cur = db.cursor()
     cur.execute(
-        'UDPDATE allies SET username = ? WHERE profile_id = ?', (name, uid))
+        'UPDATE allies SET username = ? WHERE profile_id = ?', (name, uid))
+    db.commit()
+    cur.close()
 
 
 def alert_mame_change(old, new):
     """Alerts the server about a new name change"""
+    print("sending message")
     wh = SyncWebhook.from_url(WEBHOOK_URL)
     wh.send(f"Ally changed name from `{old}` to `{new}`.")
 
 
 def check_tuts():
     """Checks the tutors for strips for all allies."""
+    update_list = False
     for ally in ALLIES:
-
         username = ally.get('username')
         uid = ally.get('profile_id')
+
         if not uid:
             profile = get_profile(ACCESS_TOKEN, username)
+
             if not profile:
                 print('No ID present and username doesn\'t exist')
                 sys.exit(5)
+
             uid = profile.get('user_id')
             update_user_id(uid, username)
+
         else:
             profile = get_profile_by_id(ACCESS_TOKEN, uid)
+
             if not profile['username'] == username:
+                print(profile['username'])
                 alert_mame_change(username, profile['username'])
+
                 ally.username = profile['username']
                 username = profile['username']
+                update_list = True
                 update_username(profile['username'], uid)
 
         tmp_stats = (profile.get('fights_lost'), profile.get('steals_lost'),
@@ -303,7 +315,17 @@ def check_tuts():
 
                     confirm_strip(missing, username, battle_sts)
 
-        time.sleep(10)
+        time.sleep(3)
+    if update_list:
+
+        cur = db.cursor()
+        cur.execute("SELECT * FROM allies")
+
+        r = cur.fetchall()
+        cur.close()
+
+        ALLIES.clear()
+        ALLIES.extend(r)
 
 
 def confirm_strip(missing, username, battle_sts):
@@ -367,7 +389,7 @@ def watch_fls(username, bsts):
             alert_fls(username, nochange=True)
             unchanged += 1
 
-        time.sleep(10)
+        time.sleep(10 * 60)
 
 
 def alert_fls(username, new_stats=None, prev_stats=None, nochange=False, stopping=False):
@@ -398,7 +420,7 @@ def alert_fls(username, new_stats=None, prev_stats=None, nochange=False, stoppin
     embed.add_field(name="Initial stats",
                     value=f"FL: {initial.fl} DL: {initial.dl}")
 
-    wh.send(content="@everyone", embed=embed)
+    wh.send(content="<@&1273745059015036938>", embed=embed)
 
 
 def alert_server(person, missing=None, added=None, total=None):
@@ -417,7 +439,7 @@ def alert_server(person, missing=None, added=None, total=None):
         embed.add_field(name="New tutors hired",
                         value=", ".join(added), inline=False)
     wh = SyncWebhook.from_url(WEBHOOK_URL)
-    wh.send(content="@everyone", embed=embed)
+    wh.send(content="<@&1273744969978613772>", embed=embed)
 
 
 if __name__ == "__main__":
@@ -427,7 +449,7 @@ if __name__ == "__main__":
         while not STOP:
             print('Checking tutors.')
             check_tuts()
-            time.sleep(10)
+            time.sleep(10 * 60)
     except KeyboardInterrupt:
         STOP = True
         print('Exiting...')
