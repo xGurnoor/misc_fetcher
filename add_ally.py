@@ -6,22 +6,47 @@ import argparse
 import json
 
 import requests
+from prettytable.colortable import ColorTable, Themes
 
-conn = sqlite3.connect('data/stats.db')
 
 parser = argparse.ArgumentParser(
-    prog="MiscFetcher",
-    description='Gets and calculated misc of given username',
+    description='Adds an ally to the ally database',
     epilog="APIs for the win"
 )
 
 
+parser.add_argument('-l', '--list',
+                    help="List all the added allies", default=False, action="store_true")
 parser.add_argument('-u', '--username',
-                    help="The list to use", required=True, nargs=argparse.REMAINDER)
+                    help="The list to use", nargs=argparse.REMAINDER)
+args = parser.parse_args()
+if not args.list and not args.username:
+    print("No arguments supplied.")
+    parser.print_help()
+    sys.exit()
 
+
+class Row(sqlite3.Row):
+    """Overriden row class to make row data printable
+    Not performant."""
+
+    def __repr__(self) -> str:
+        return str(dict(self))
+
+    def get(self, key):
+        """Mimic get function from builtin Dict class"""
+        try:
+            return self[key]
+        except IndexError:
+            return None
+
+
+conn = sqlite3.connect('data/stats.db')
+conn.row_factory = Row
 
 with open("tokens.json", 'r', encoding="UTF-8") as f:
     tokens = json.load(f)
+
 
 ACCESS_TOKEN = tokens['access_token']
 REFERSH_TOKEN = tokens['refresh_token']
@@ -36,9 +61,9 @@ def get_profile(profile_name, token=None):
     if not token:
         token = ACCESS_TOKEN
 
-    r = requests.post(url, data={"profile_username": profile_name}, timeout=400, headers={
+    resp = requests.post(url, data={"profile_username": profile_name}, timeout=400, headers={
         "Authorization": f"Bearer {token}", "user-agent": "pimddroid/526"})
-    res = r.json()
+    res = resp.json()
     # fp = open('testing/new_prof.json', 'w', encoding='utf-8')
     # json.dump(res, fp, indent=2)
     # fp.close()
@@ -88,17 +113,33 @@ def get_access_token(resp=False):
         "grant_type": "refresh_token",
         "client_information": CLIENT_INFORMATION
     }
-    r = requests.post(url, payload, timeout=400)
+    res = requests.post(url, payload, timeout=400)
     if resp:
-        rsp = r.json()
+        rsp = res.json()
         return [rsp, rsp['access_token']]
 
-    return r.json()['access_token']
+    return res.json()['access_token']
 
 
 if __name__ == "__main__":
+    if args.list:
 
-    args = parser.parse_args()
+        t = ColorTable(['Name', 'ID'], theme=Themes.OCEAN)
+
+        cur = conn.cursor()
+        cur.execute('select * from allies')
+
+        r = cur.fetchall()
+
+        cur.close()
+
+        for ally in r:
+            t.add_row([ally['username'], ally['profile_id']])
+
+        print(t)
+    if not args.username:
+        sys.exit()
+
     username = args.username[0]
 
     profile = get_profile(username)

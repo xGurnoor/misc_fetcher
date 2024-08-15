@@ -30,7 +30,6 @@ import requests
 from prettytable import PrettyTable
 
 parser = argparse.ArgumentParser(
-    prog="MiscFetcher",
     description='Gets and calculated misc of given username',
     epilog="APIs for the win"
 )

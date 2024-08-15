@@ -36,8 +36,7 @@ from discord import Embed, SyncWebhook, Color
 from collections import namedtuple
 
 parser = argparse.ArgumentParser(
-    prog="MiscFetcher",
-    description='Gets and calculated misc of given username',
+    description='Watches allies for strips',
     epilog="APIs for the win"
 )
 
