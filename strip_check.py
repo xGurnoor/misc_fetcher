@@ -28,11 +28,12 @@ import os
 import argparse
 import time
 import threading
+import sqlite3
 import requests
 
 # pylint: disable=wrong-import-order
-from collections import namedtuple
 from discord import Embed, SyncWebhook, Color
+from collections import namedtuple
 
 parser = argparse.ArgumentParser(
     prog="MiscFetcher",
@@ -41,37 +42,43 @@ parser = argparse.ArgumentParser(
 )
 
 
-parser.add_argument('-l', '--list',
-                    help="The list to use", default="allies.json", nargs=argparse.REMAINDER)
-
-
-args = parser.parse_args()
-if isinstance(args.list, list):
-    args.list = ' '.join(args.list)
-if args.list.strip() == '':
-    print('Provide a value for \'list\' parameter.')
-    sys.exit(3)
-
 with open("tokens.json", 'r', encoding="UTF-8") as f:
     tokens = json.load(f)
 
-if not os.path.exists('allies.json'):
-    with open('allies.json', 'w', encoding='utf-8') as fp:
-        dump = {"usernames": []}
-        json.dump(dump, fp)
 
-with open('allies.json', 'r', encoding='utf-8') as fp:
-    ALLIES = json.load(fp)
+class Row(sqlite3.Row):
+    """Overriden row class to make row data printable
+    Not performant."""
 
-if not ALLIES:
-    print("allies.json is empty.")
-    sys.exit(4)
-if not os.path.exists('stats'):
-    os.mkdir('stats')
-if not os.path.exists('stats/tut_list.json'):
-    with open('stats/tut_list.json', 'w', encoding='utf-8') as fp:
+    def __repr__(self) -> str:
+        return str(dict(self))
+
+    def get(self, key):
+        """Mimic get function from builtin Dict class"""
+        try:
+            return self[key]
+        except IndexError:
+            return None
+
+# if not os.path.exists('allies.json'):
+#     with open('allies.json', 'w', encoding='utf-8') as fp:
+#         dump = {"usernames": []}
+#         json.dump(dump, fp)
+
+# with open('allies.json', 'r', encoding='utf-8') as fp:
+#     ALLIES = json.load(fp)
+
+
+# if not ALLIES:
+#     print("allies.json is empty.")
+#     sys.exit(4)
+
+if not os.path.exists('data'):
+    os.mkdir('data')
+if not os.path.exists('data/tut_list.json'):
+    with open('data/tut_list.json', 'w', encoding='utf-8') as fp:
         fp.write('{}')
-with open('stats/tut_list.json', 'r', encoding='utf-8') as fp:
+with open('data/tut_list.json', 'r', encoding='utf-8') as fp:
     TUT_LIST = json.load(fp)
 
 # globals
@@ -83,13 +90,61 @@ EXCEPTION_COUNTER = {"count": 0}
 STOP = False
 WATCH_LIST = []
 BATTLE_STATS = {}
+ALLIES = []
+
+db = sqlite3.connect('data/stats.db')
+db.row_factory = Row
 
 BattleStats = namedtuple('BattleStats', ['fl', 'dl', 'pl', 'el'])
 
 
+def setup_db():
+    """Setups the SQLite database before use"""
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS allies(id SERIAL, username TEXT, profile_id BIGINT)")
+    # db.execute(
+    #     "CREATE TABLE IF NOT EXISTS tutors(id SERIAL, ally FOREIGN KEY, tuts JSON)")
+    db.commit()
+
+    cur = db.cursor()
+    cur.execute('SELECT * FROM ALLIES')
+    res = cur.fetchall()
+    if not res:
+        print('Ally list is empty, exiting.')
+        sys.exit(4)
+    ALLIES.extend(res)
+
+
+def get_profile_by_id(token, profile_id):
+    """Gets the profile data by ID"""
+    url = "https://api.partyinmydorm.com/game/user/get_profile/"
+    r = requests.post(url, data={"profile_user_id": profile_id}, timeout=400, headers={
+        "Authorization": f"Bearer {token}", "user-agent": "pimddroid/526"})
+    res = r.json()
+    ex = res.get('exception')
+    if not ex:
+        return res
+    if "Session expired" in ex:
+        if EXCEPTION_COUNTER['count'] > 3:
+            print('Failed to fetch new valid access token 3 times. Exiting.')
+            sys.exit(3)
+
+        EXCEPTION_COUNTER['count'] += 1
+        print(
+            f'{EXCEPTION_COUNTER["count"]}: Session expired. Fetching new token and retrying...')
+        new_token = update_access_token()
+        return get_profile_by_id(new_token, profile_id)
+    elif "Username doesn't exist" in ex:
+        print(ex)
+        sys.exit(6)
+
+    print("Unknown error: ", res)
+    sys.exit(4)
+
+
 def get_profile(token, profile_name):
     """Gets the profile data by username"""
-    url = "https://api.partyinmydorm.com/game/user/get_profile_by_username/"
+    url = "https://api.partyinmydorm.com/game/user/get_profile_by_name/"
     r = requests.post(url, data={"profile_username": profile_name}, timeout=400, headers={
         "Authorization": f"Bearer {token}", "user-agent": "pimddroid/526"})
     res = r.json()
@@ -107,9 +162,9 @@ def get_profile(token, profile_name):
             f'{EXCEPTION_COUNTER["count"]}: Session expired. Fetching new token and retrying...')
         new_token = update_access_token()
         return get_profile(new_token, profile_name)
-    elif "Username doesn't exist" in ex:
+    elif "Username doesn't exist, updating" in ex:
         print(ex)
-        sys.exit(6)
+        return None
 
     print("Unknown error: ", res)
     sys.exit(4)
@@ -161,29 +216,51 @@ def convert_to_human(i: int):
     return i
 
 
+def update_user_id(uid, username):
+    """Updates user ID in the database"""
+    cur = db.cursor()
+    cur.execute("UPDATE allies SET profile_id=? WHERE username=?",
+                (uid, username))
+    db.commit()
+    cur.close()
+
+
 def check_tuts():
     """Checks the tutors for strips for all allies."""
-    for username in ALLIES['usernames']:
-        profile = get_profile(ACCESS_TOKEN, username)
+    for ally in ALLIES:
+
+        username = ally.get('username')
+        uid = ally.get('profile_id')
+        if not uid:
+            profile = get_profile(ACCESS_TOKEN, username)
+            if not profile:
+                print('No ID present and username doesn\'t exist')
+                sys.exit(5)
+            uid = profile.get('user_id')
+            update_user_id(uid, username)
+        else:
+            profile = get_profile_by_id(ACCESS_TOKEN, uid)
         # json.dump(profile, open("test.json", "w"), indent=2)
         # exit()
-        temp = profile.get('clan_members')
-        fl = profile.get('fights_lost')
-        dl = profile.get('steals_lost')
-        pl = profile.get('assassinates_lost')
-        el = profile.get('scouts_lost')
-        battle_sts = BattleStats(fl, dl, pl, el)
+        print(ally)
+        tmp_stats = (profile.get('fights_lost'), profile.get('steals_lost'),
+                     profile.get('assassinates_lost'), profile.get('scouts_lost'))
+        battle_sts = BattleStats(*tmp_stats)
         tutors = []
-        for x in temp:
+
+        for x in profile.get('clan_members'):
             tut = {'user_id': x['user_id'], 'username': x['username']}
             tutors.append(tut)
+
         # print(f"IGN: {username}: \n", json.dumps(tutors, indent=2))
         old_list = TUT_LIST.get(username)
+
         if not old_list:
             TUT_LIST[username] = tutors
             with open('stats/tut_list.json', 'w', encoding='utf-8') as tut_list_fp:
                 json.dump(TUT_LIST, tut_list_fp, indent=2)
         else:
+
             temp1 = []
             for x in tutors:
                 temp1.append(x['username'])
@@ -191,37 +268,50 @@ def check_tuts():
             temp2 = []
             for x in old_list:
                 temp2.append(x['username'])
+
             missing = set(temp2).difference(temp1)
             added = set(temp1).difference(temp2)
+
             if missing or added:
 
                 TUT_LIST[username] = tutors
                 with open('tut_list.json', 'w', encoding='utf-8') as tut_list_fp:
                     json.dump(TUT_LIST, tut_list_fp, indent=2)
+
                 if missing:
+
                     confirm_strip(missing, username, battle_sts)
-                    # alert_server(username, list(missing), list(added))
-        time.sleep(2)
+
+        time.sleep(10)
 
 
 def confirm_strip(missing, username, battle_sts):
     """Takes in missing tuts and checks who hired to confirm
       they were hired away not buried in the tut list"""
+
     missing_tut_list = []
     hired = 0
+
     for miss in missing:
         profile = get_profile(ACCESS_TOKEN, miss)
+
         hv = profile.get("value")
         hired += hv
+
         owner = profile.get('owner')
+
         if not owner or not owner['username'].lower() == username.lower():
             missing_tut_list.append([miss, hv])
+
     if not missing_tut_list:
         return
+
     alert_server(username, missing=missing_tut_list, total=hired)
+
     if not BATTLE_STATS.get(username):
         t = threading.Thread(target=watch_fls, args=(
             username, battle_sts), daemon=True)
+
         t.start()
 
 
@@ -230,6 +320,7 @@ def watch_fls(username, bsts):
     if not BATTLE_STATS.get(username):
         BATTLE_STATS[username] = bsts
     unchanged = 0
+
     while True:
 
         profile = get_profile(ACCESS_TOKEN, username)
@@ -238,6 +329,7 @@ def watch_fls(username, bsts):
         dl = profile.get('steals_lost')
         pl = profile.get('assassinates_lost')
         el = profile.get('scouts_lost')
+
         new_bsts = BattleStats(fl, dl, pl, el)
 
         if not fl == bsts.fl or not dl == bsts.dl:
@@ -254,7 +346,7 @@ def watch_fls(username, bsts):
             alert_fls(username, nochange=True)
             unchanged += 1
 
-        time.sleep(10)
+        time.sleep(10 * 60)
 
 
 def alert_fls(username, new_stats=None, prev_stats=None, nochange=False, stopping=False):
@@ -311,9 +403,10 @@ if __name__ == "__main__":
     try:
         print('Starting tutor checker.')
         while not STOP:
+            setup_db()
             print('Checking tutors.')
             check_tuts()
-            time.sleep(20)
+            time.sleep(10 * 60)
     except KeyboardInterrupt:
         STOP = True
         print('Exiting...')
