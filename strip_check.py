@@ -137,7 +137,7 @@ def get_profile_by_id(token, profile_id):
         print(ex)
         sys.exit(6)
 
-    print("Unknown error: ", res)
+    print("Unknown error in getting with ID: ", res)
     sys.exit(4)
 
 
@@ -169,7 +169,7 @@ def get_profile(token, profile_name):
         print(ex)
         return None
 
-    print("Unknown error: ", res)
+    print("Unknown error in getting with name: ", res)
     sys.exit(4)
 
 
@@ -430,6 +430,7 @@ def alert_server(person, missing=None, added=None, total=None):
 
 
 def update_allies():
+    """Updates the local ally list after every check"""
     cur = db.cursor()
     cur.execute("SELECT * FROM allies")
 
