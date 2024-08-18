@@ -131,6 +131,7 @@ def get_profile_by_id(token, profile_id):
         EXCEPTION_COUNTER['count'] += 1
         print(
             f'{EXCEPTION_COUNTER["count"]}: Session expired. Fetching new token and retrying...')
+        print(ex)
         new_token = update_access_token()
         return get_profile_by_id(new_token, profile_id)
     elif "Username doesn't exist" in ex:
@@ -148,6 +149,9 @@ def get_profile(token, profile_name):
         "Authorization": f"Bearer {token}", "user-agent": "pimddroid/526"})
     try:
         res = r.json()
+        if EXCEPTION_COUNTER['count']:
+            with open('error.json', 'w', encoding='utf-8') as efp:
+                json.dump(res, efp, indent=2)
     except requests.exceptions.JSONDecodeError:
         print("Error in decoding this: ", r.text)
         return
