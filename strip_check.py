@@ -344,7 +344,7 @@ def confirm_strip(missing, username, battle_sts):
         owner = profile.get('owner')
 
         if not owner or not owner['username'].lower() == username.lower():
-            missing_tut_list.append([miss, hv])
+            missing_tut_list.append([miss, hv, owner['username']])
 
     if not missing_tut_list:
         return
@@ -428,17 +428,25 @@ def alert_server(person, missing=None, added=None, total=None):
     embed = Embed(title="Strip alert",
                   description=f"{person} was potentially stripped.", color=Color.blurple())
     if missing:
+
         missing_str = []
+
         for x in missing:
-            missing_str.append(f"{x[0]}: ${convert_to_human(x[1])}")
+            missing_str.append(
+                f"{x[0]}: ${convert_to_human(x[1])} Hired by: {x[2]}")
+
         missing_str.append(f'\n\nTotal stripped: ${convert_to_human(total)}')
+
         embed.add_field(name="Tutors missing",
                         value="\n".join(missing_str), inline=False)
     if added:
+
         added = [f"`{x}`" for x in added]
         embed.add_field(name="New tutors hired",
                         value=", ".join(added), inline=False)
+
     wh = SyncWebhook.from_url(WEBHOOK_URL)
+
     wh.send(content="<@&1273744969978613772>", embed=embed)
 
 
