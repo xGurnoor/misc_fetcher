@@ -239,6 +239,9 @@ def calculate(stats_, techtree_):
 def convert_to_human(i: int):
     """Converts given long numbers into human readable"""
 
+    if i >= 1_000_000_000_000:
+        temp = i / 1_000_000_000_000
+        return f"{temp:.2f}T"
     if i >= 1_000_000_000:
         temp = i / 1_000_000_000
         return f"{temp:.2f}B"

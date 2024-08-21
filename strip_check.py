@@ -97,6 +97,12 @@ db.row_factory = Row
 BattleStats = namedtuple('BattleStats', ['fl', 'dl', 'pl', 'el'])
 
 
+def chunks(lst, n):
+    """Yield successive n-sized chunks from lst."""
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
+
+
 def setup_db():
     """Setups the SQLite database before use"""
     db.execute(
@@ -169,9 +175,9 @@ def get_profile(token, profile_name):
             f'{EXCEPTION_COUNTER["count"]}: Session expired. Fetching new token and retrying...')
         new_token = update_access_token()
         return get_profile(new_token, profile_name)
-    elif "Username doesn't exist, updating" in ex:
+    if "Username doesn't exist, updating" in ex:
         print(ex)
-        return None
+        return
 
     print("Unknown error in getting with name: ", res)
     sys.exit(4)
@@ -211,6 +217,9 @@ def get_access_token(resp=False):
 def convert_to_human(i: int):
     """Converts given long numbers into human readable"""
 
+    if i >= 1_000_000_000_000:
+        temp = i / 1_000_000_000_000
+        return f"{temp:.2f}T"
     if i >= 1_000_000_000:
         temp = i / 1_000_000_000
         return f"{temp:.2f}B"
