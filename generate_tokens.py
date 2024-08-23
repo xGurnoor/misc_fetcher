@@ -158,7 +158,7 @@ def get_payload(ad, a_id, a_sid):
 
 tokens = []
 
-for x in range(8):
+for x in range(7):
     try:
         res = run()
 
@@ -168,6 +168,7 @@ for x in range(8):
         break
     refresh = res[0]
     client_info = get_payload(res[1], res[2], res[3])
+    client_info = json.dumps(client_info)
     tokens.append(f"{refresh}:SPLIT:{client_info}")
 
 with open('tokens.txt', 'w', encoding='utf-8') as fp:

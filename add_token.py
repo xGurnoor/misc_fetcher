@@ -70,6 +70,8 @@ if __name__ == "__main__":
             args = []
             for x in l:
                 refresh_token, client_info = x.split(":SPLIT:")
+                client_info = client_info.replace("'", '"')
+                client_info = client_info.replace("False", "false")
                 args.append(('placeholder', refresh_token, client_info))
             conn.executemany(sql, args)
             conn.commit()
