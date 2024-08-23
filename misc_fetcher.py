@@ -21,13 +21,16 @@
 # SOFTWARE.
 
 """Script to get and calculate misc"""
+import logging
 import sys
 import json
 import sqlite3
 import argparse
-import requests
+
 
 from prettytable import PrettyTable
+from utils.utils import Row, convert_to_human, ProxyManager
+from utils.api import API, UsernameNotFound
 
 parser = argparse.ArgumentParser(
     description='Gets and calculated misc of given username',
@@ -52,132 +55,73 @@ if not username:
 with open("tokens.json", 'r', encoding="UTF-8") as f:
     tokens = json.load(f)
 
-ACCESS_TOKEN = tokens['access_token']
-REFERSH_TOKEN = tokens['refresh_token']
-EXCEPTION_COUNTER = {"count": 0}
-CLIENT_INFORMATION = json.dumps(tokens['client_information'])
+with open('proxylist.txt', 'r', encoding='utf-8') as fp:
+
+    proxy_manager = ProxyManager(fp)
+
+db = sqlite3.connect('data/stats.db')
+techdb = sqlite3.connect('techtree.sqlite')
+
+logger = logging.getLogger('Misc Fetcher')
+logging.basicConfig(level=logging.INFO)
+
+db.row_factory = Row
 STACK_LIST = []
 
+tcur = db.cursor()
+tcur.execute('SELECT * FROM tokens')
 
-def get_profile(token, profile_name):
-    """Gets the profile data by username"""
-    url = "https://api.partyinmydorm.com/game/user/get_profile_by_username/"
+data = tcur.fetchone()
+tcur.close()
 
-    r = requests.post(url, data={"profile_username": profile_name}, timeout=400, headers={
-        "Authorization": f"Bearer {token}", "user-agent": "pimddroid/526"})
-    res = r.json()
-    # fp = open('testing/new_prof.json', 'w', encoding='utf-8')
-    # json.dump(res, fp, indent=2)
-    # fp.close()
-    ex = res.get('exception')
-    if not ex:
-        return res
+api = API(data, db, proxy=proxy_manager.get())
 
-    if "Session expired" in ex:
-        if EXCEPTION_COUNTER['count'] > 3:
-            print('Failed to fetch new valid access token 3 times. Exiting.')
-            sys.exit(3)
-
-        EXCEPTION_COUNTER['count'] += 1
-        print(
-            f'{EXCEPTION_COUNTER["count"]}: Session expired. Fetching new token and retrying...')
-        new_token = update_access_token()
-        return get_profile(new_token, profile_name)
-    elif "Username doesn't exist" in ex:
-        print(ex)
-        sys.exit(6)
-
-    print("Unknown error: ", res)
-    sys.exit(4)
-
-
-def update_access_token():
-    """Tries to update the access token"""
-    new_token = get_access_token()
-    tokens['access_token'] = new_token
-    with open('tokens.json', 'w', encoding='UTF-8') as fp:
-        json.dump(tokens, fp, indent=4)
-    return new_token
-
-
-def get_access_token(resp=False):
-    """Fetchs new access token"""
-    url = "https://api.partyinmydorm.com/game/login/oauth/"
-    payload = {
-        "channel_id": "16",
-        "client_id": "ata.squid.pimd",
-        "client_version": "534",
-        "refresh_token": REFERSH_TOKEN,
-        "scope": "[\"all\"]",
-        "version": "3320",
-        "client_secret": "n0ts0s3cr3t",
-        "grant_type": "refresh_token",
-        "client_information": CLIENT_INFORMATION
-    }
-    # print('sending request')
-    r = requests.post(url, payload, timeout=400)
-    # json.dump(r.json(), open('login_test.json', 'w'), indent=2)
-    # exit()
-    if resp:
-        rsp = r.json()
-        return [rsp, rsp['access_token']]
-
-    return r.json()['access_token']
+db.execute(
+    'CREATE TABLE IF NOT EXISTS tokens(access_token TEXT, refresh_token TEXT, client_info TEXT)')
 
 
 def refetch(techtree):
     """Refetches new misc items and add to techtree"""
-    # print('start')
-    rsp = get_access_token(True)
-    new_token = rsp[1]
-    tokens['access_token'] = new_token
-    with open('tokens.json', 'w', encoding='UTF-8') as fp:
-        json.dump(tokens, fp, indent=4)
-    db = sqlite3.connect('techtree.sqlite')
-    cur = db.cursor()
-    # print('open db')
+
+    rsp = api.get_access_token(resp=True)
+
+    cur = techdb.cursor()
+
     resp = rsp[0]
-    # json.dump(resp, open('debug.log.json', 'w'), indent=2)
     items = resp['new_items']
-    # print('starting loop')
-    # print('items: ', items)
-    # items = json.load(open('new_items.json', 'r'))['new_items']
+
     for item in items:
-        # print('in loop')
         if techtree.get(item['id']):
-            # print('id exists')
             continue
 
         id_ = item['id']
         desc = item['description']
         name = item['name']
+
         base_id = item.get('base_id', 0)
         att_ = item.get('attack', 0)
         int_att = item.get('spy_attack', 0)
         per = item.get('percentage', 0)
+
         optionals_json = json.dumps(
             {"attack": att_, "spy_attack": int_att, "percentage": per})
         cur.execute(
             'INSERT INTO counterunit (id, optionals_json, base_id, name, description) VALUES (?, ?, ?, ?, ?)', [id_, optionals_json, base_id, name, desc])
     cur.close()
-    db.commit()
-    db.close()
+    techdb.commit()
 
 
 def build_techtree():
     """Builds the TechTree from SQLite DB and stores in a dict"""
     temp_tree = {}
 
-    db = sqlite3.connect('techtree.sqlite')
-
-    cur = db.cursor()
+    cur = techdb.cursor()
     res = cur.execute(
         'SELECT id, optionals_json, base_id, name FROM counterunit')
 
     result = res.fetchall()
 
     cur.close()
-    db.close()
 
     for x in result:
         temp_tree[x[0]] = json.loads(x[1])
@@ -202,13 +146,15 @@ def calculate(stats_, techtree_):
             print("Item ID: "
                   f"{stat['id']} not present in TechTree DB. Refetching.")
             refetch(techtree_)
-            # print('refetch done')
             sys.exit(0)
+
         if item['base_id']:
             continue
+
         is_per = item.get('percentage')
         if is_per is None:
             continue
+
         if args.stacks:
             if stat.get("count") > args.count and stat.get('count') < 251:
 
@@ -219,6 +165,7 @@ def calculate(stats_, techtree_):
         if is_per:
             total_att_per += item.get('attack', 0) * stat.get("count")
             total_def_per += item.get('spy_attack', 0) * stat.get("count")
+
         else:
             total_att += item.get('attack', 0) * stat.get("count")
             total_def += item.get('spy_attack', 0) * stat.get("count")
@@ -236,31 +183,18 @@ def calculate(stats_, techtree_):
     )
 
 
-def convert_to_human(i: int):
-    """Converts given long numbers into human readable"""
-
-    if i >= 1_000_000_000_000:
-        temp = i / 1_000_000_000_000
-        return f"{temp:.2f}T"
-    if i >= 1_000_000_000:
-        temp = i / 1_000_000_000
-        return f"{temp:.2f}B"
-    if i >= 1_000_000:
-        temp = i / 1_000_000
-        return f"{temp:.2f}M"
-    if i >= 1000:
-        temp = i / 1000
-        return f"{temp:.2f}K"
-    return i
-
-
 if __name__ == "__main__":
-    profile = get_profile(ACCESS_TOKEN, username)
-    # json.dump(profile, open("test.json", "w"), indent=2)
-    # exit()
+
+    try:
+        profile = api.get_profile(username)
+    except UsernameNotFound:
+        logger.warning('Username not found, exiting.')
+        sys.exit(5)
+
     showcase = profile.get('showcase')
+
     if not showcase:
-        print('No showcase present in profile?')
+        logger.error('No showcase present in profile?')
         sys.exit(5)
 
     tech_tree = build_techtree()

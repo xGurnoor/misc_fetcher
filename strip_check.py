@@ -28,71 +28,55 @@ import os
 import argparse
 import time
 import threading
+import logging
 import sqlite3
-import requests
 
 # pylint: disable=wrong-import-order
 from discord import Embed, SyncWebhook, Color
 from collections import namedtuple
 
+from utils.api import API
+from utils.utils import convert_to_human, ProxyManager, Row
+
+# logging.basicConfig(level=logging.INFO)
 parser = argparse.ArgumentParser(
     description='Watches allies for strips',
     epilog="APIs for the win"
 )
 
-
-with open("tokens.json", 'r', encoding="UTF-8") as f:
-    tokens = json.load(f)
-
-
-class Row(sqlite3.Row):
-    """Overriden row class to make row data printable
-    Not performant."""
-
-    def __repr__(self) -> str:
-        return str(dict(self))
-
-    def get(self, key):
-        """Mimic get function from builtin Dict class"""
-        try:
-            return self[key]
-        except IndexError:
-            return None
-
-# if not os.path.exists('allies.json'):
-#     with open('allies.json', 'w', encoding='utf-8') as fp:
-#         dump = {"usernames": []}
-#         json.dump(dump, fp)
-
-# with open('allies.json', 'r', encoding='utf-8') as fp:
-#     ALLIES = json.load(fp)
-
-
-# if not ALLIES:
-#     print("allies.json is empty.")
-#     sys.exit(4)
-
 if not os.path.exists('data'):
     os.mkdir('data')
+
 if not os.path.exists('data/tut_list.json'):
     with open('data/tut_list.json', 'w', encoding='utf-8') as fp:
         fp.write('{}')
-with open('data/tut_list.json', 'r', encoding='utf-8') as fp:
-    TUT_LIST = json.load(fp)
+
+
+with open('tokens.json', 'r', encoding='utf-8') as fp:
+    config = json.load(fp)
+
+with open('proxylist.txt', 'r', encoding='utf-8') as fp:
+    proxy_manager = ProxyManager(fp)
+
 
 # globals
-ACCESS_TOKEN = tokens['access_token']
-REFERSH_TOKEN = tokens['refresh_token']
-WEBHOOK_URL = tokens['discord_webhook_url']
-CLIENT_INFORMATION = json.dumps(tokens['client_information'])
-EXCEPTION_COUNTER = {"count": 0}
+
+# ACCESS_TOKEN = tokens['access_token']
+# REFERSH_TOKEN = tokens['refresh_token']
+
+WEBHOOK_URL = config['discord_webhook_url']
+
+
 STOP = False
 WATCH_LIST = []
 BATTLE_STATS = {}
 ALLIES = []
 
-db = sqlite3.connect('data/stats.db')
-db.row_factory = Row
+conn = sqlite3.connect('data/stats.db')
+conn.row_factory = Row
+
+# add logic to scale this
+# api = API(tokens, db, proxy_manager.get())
 
 BattleStats = namedtuple('BattleStats', ['fl', 'dl', 'pl', 'el'])
 
@@ -105,13 +89,15 @@ def chunks(lst, n):
 
 def setup_db():
     """Setups the SQLite database before use"""
-    db.execute(
-        "CREATE TABLE IF NOT EXISTS allies(id SERIAL, username TEXT, profile_id BIGINT)")
-    # db.execute(
-    #     "CREATE TABLE IF NOT EXISTS tutors(id SERIAL, ally FOREIGN KEY, tuts JSON)")
-    db.commit()
+    # pylint: disable=line-too-long
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS allies(id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, profile_id BIGINT)")
+    conn.execute('CREATE TABLE IF NOT EXISTS tokens(id INTEGER PRIMARY KEY AUTOINCREMENT, access_token TEXT, refresh_token TEXT, client_info TEXT)')
+    conn.execute(
+        'CREATE TABLE IF NOT EXISTS tutors(id INTEGER PRIMARY KEY AUTOINCREMENT, tutor_username TEXT, tutor_id TEXT, uid BIGINT)')
+    conn.commit()
 
-    cur = db.cursor()
+    cur = conn.cursor()
     cur.execute('SELECT * FROM ALLIES')
     res = cur.fetchall()
     if not res:
@@ -120,119 +106,7 @@ def setup_db():
     ALLIES.extend(res)
 
 
-def get_profile_by_id(token, profile_id):
-    """Gets the profile data by ID"""
-    url = "https://api.partyinmydorm.com/game/user/get_profile/"
-    r = requests.post(url, data={"profile_user_id": profile_id}, timeout=400, headers={
-        "Authorization": f"Bearer {token}", "user-agent": "pimddroid/526"})
-    res = r.json()
-    ex = res.get('exception')
-    if not ex:
-        return res
-    if "Session expired" in ex:
-        if EXCEPTION_COUNTER['count'] > 3:
-            print('Failed to fetch new valid access token 3 times. Exiting.')
-            sys.exit(3)
-
-        EXCEPTION_COUNTER['count'] += 1
-        print(
-            f'{EXCEPTION_COUNTER["count"]}: Session expired. Fetching new token and retrying...')
-        print(ex)
-        new_token = update_access_token()
-        return get_profile_by_id(new_token, profile_id)
-    elif "Username doesn't exist" in ex:
-        print(ex)
-        sys.exit(6)
-
-    print("Unknown error in getting with ID: ", res)
-    sys.exit(4)
-
-
-def get_profile(token, profile_name):
-    """Gets the profile data by username"""
-    url = "https://api.partyinmydorm.com/game/user/get_profile_by_username/"
-    r = requests.post(url, data={"profile_username": profile_name}, timeout=400, headers={
-        "Authorization": f"Bearer {token}", "user-agent": "pimddroid/526"})
-    try:
-        res = r.json()
-        if EXCEPTION_COUNTER['count']:
-            with open('error.json', 'w', encoding='utf-8') as efp:
-                json.dump(res, efp, indent=2)
-    except requests.exceptions.JSONDecodeError:
-        print("Error in decoding this: ", r.text)
-        return
-    ex = res.get('exception')
-    if not ex:
-        return res
-
-    if "Session expired" in ex:
-        if EXCEPTION_COUNTER['count'] > 3:
-            print('Failed to fetch new valid access token 3 times. Exiting.')
-            sys.exit(3)
-
-        EXCEPTION_COUNTER['count'] += 1
-        print(
-            f'{EXCEPTION_COUNTER["count"]}: Session expired. Fetching new token and retrying...')
-        new_token = update_access_token()
-        return get_profile(new_token, profile_name)
-    if "Username doesn't exist, updating" in ex:
-        print(ex)
-        return
-
-    print("Unknown error in getting with name: ", res)
-    sys.exit(4)
-
-
-def update_access_token():
-    """Tries to update the access token"""
-    new_token = get_access_token()
-    tokens['access_token'] = new_token
-    with open('tokens.json', 'w', encoding='UTF-8') as tokens_fp:
-        json.dump(tokens, tokens_fp, indent=4)
-    return new_token
-
-
-def get_access_token(resp=False):
-    """Fetchs new access token"""
-    url = "https://api.partyinmydorm.com/game/login/oauth/"
-    payload = {
-        "channel_id": "16",
-        "client_id": "ata.squid.pimd",
-        "client_version": "534",
-        "refresh_token": REFERSH_TOKEN,
-        "scope": "[\"all\"]",
-        "version": "3310",
-        "client_secret": "n0ts0s3cr3t",
-        "grant_type": "refresh_token",
-        "client_information": CLIENT_INFORMATION
-    }
-    r = requests.post(url, payload, timeout=400)
-    if resp:
-        rsp = r.json()
-        return [rsp, rsp['access_token']]
-
-    return r.json()['access_token']
-
-
-def convert_to_human(i: int):
-    """Converts given long numbers into human readable"""
-
-    if i >= 1_000_000_000_000:
-        temp = i / 1_000_000_000_000
-        return f"{temp:.2f}T"
-    if i >= 1_000_000_000:
-        temp = i / 1_000_000_000
-        return f"{temp:.2f}B"
-    if i >= 1_000_000:
-        temp = i / 1_000_000
-        return f"{temp:.2f}M"
-    if i >= 1000:
-        temp = i / 1000
-        return f"{temp:.2f}K"
-    return i
-
-
-def update_user_id(uid, username):
+def update_user_id(db, uid, username):
     """Updates user ID in the database"""
     cur = db.cursor()
     cur.execute("UPDATE allies SET profile_id=? WHERE username=?",
@@ -241,9 +115,8 @@ def update_user_id(uid, username):
     cur.close()
 
 
-def update_username(name, uid):
+def update_username(db, name, uid):
     """Update username in the database"""
-    print('updating name')
     cur = db.cursor()
     cur.execute(
         'UPDATE allies SET username = ? WHERE profile_id = ?', (name, uid))
@@ -253,37 +126,43 @@ def update_username(name, uid):
 
 def alert_mame_change(old, new):
     """Alerts the server about a new name change"""
-    print("sending message")
     wh = SyncWebhook.from_url(WEBHOOK_URL)
     wh.send(f"Ally changed name from `{old}` to `{new}`.")
 
 
-def check_tuts():
+def check_tuts(api, allies, num):
     """Checks the tutors for strips for all allies."""
-    for ally in ALLIES:
+
+    db = sqlite3.connect('data/stats.db')
+    db.row_factory = Row
+    api.db = db
+
+    logger = logging.getLogger(f'Stripper:{num}')
+    for ally in allies:
         username = ally.get('username')
         uid = ally.get('profile_id')
 
+        logger.info('Checking ally %s (%s)', username, uid)
+
         if not uid:
-            profile = get_profile(ACCESS_TOKEN, username)
+            profile = api.get_profile(username)
 
             if not profile:
-                print('No ID present and username doesn\'t exist')
+                logger.error('No ID present and username doesn\'t exist')
                 sys.exit(5)
 
-            uid = profile.get('user_id')
-            update_user_id(uid, username)
+            uid = int(profile.get('user_id'))
+            update_user_id(db, uid, username)
 
         else:
-            profile = get_profile_by_id(ACCESS_TOKEN, uid)
-
+            logger.info('getting profile %d', uid)
+            profile = api.get_profile_by_id(uid)
             if not profile['username'] == username:
-                print(profile['username'])
                 alert_mame_change(username, profile['username'])
 
                 ally.username = profile['username']
                 username = profile['username']
-                update_username(profile['username'], uid)
+                update_username(db, profile['username'], uid)
 
         tmp_stats = (profile.get('fights_lost'), profile.get('steals_lost'),
                      profile.get('assassinates_lost'), profile.get('scouts_lost'))
@@ -296,55 +175,72 @@ def check_tuts():
             tutors.append(tut)
 
         # print(f"IGN: {username}: \n", json.dumps(tutors, indent=2))
-        old_list = TUT_LIST.get(username)
+        cur = db.cursor()
+        cur.execute('SELECT * FROM tutors WHERE owner = ?', (uid,))
+        old_list = cur.fetchall()
 
         if not old_list:
-            TUT_LIST[username] = tutors
-            with open('stats/tut_list.json', 'w', encoding='utf-8') as tut_list_fp:
-                json.dump(TUT_LIST, tut_list_fp, indent=2)
+            args = []
+            for x in tutors:
+                args.append((x['username'], x['user_id'], uid))
+            cur.executemany(
+                "INSERT INTO tutors(tutor_username, tutor_id, owner) VALUES (?, ?, ?)", args)
+            db.commit()
+            cur.close()
         else:
 
             temp1 = []
             for x in tutors:
-                temp1.append(x['username'])
+                temp1.append(x['user_id'])
 
             temp2 = []
             for x in old_list:
-                temp2.append(x['username'])
+                temp2.append(int(x['tutor_id']))
 
             missing = set(temp2).difference(temp1)
             added = set(temp1).difference(temp2)
 
             if missing or added:
+                cur.execute('DELETE FROM tutors WHERE owner = ?', (uid,))
+                db.commit()
 
-                TUT_LIST[username] = tutors
-                with open('tut_list.json', 'w', encoding='utf-8') as tut_list_fp:
-                    json.dump(TUT_LIST, tut_list_fp, indent=2)
+                args = []
+                for x in tutors:
+                    args.append((x['username'], x['user_id'], uid))
+                cur.executemany(
+                    "INSERT INTO tutors(tutor_username, tutor_id, owner) VALUES (?, ?, ?)", args)
+
+                db.commit()
+                cur.close()
 
                 if missing:
 
-                    confirm_strip(missing, username, battle_sts)
+                    confirm_strip(api, missing, username, uid, battle_sts, num)
 
         time.sleep(3)
 
 
-def confirm_strip(missing, username, battle_sts):
+def confirm_strip(api, missing, username, uid, battle_sts, number):
     """Takes in missing tuts and checks who hired to confirm
       they were hired away not buried in the tut list"""
 
     missing_tut_list = []
     hired = 0
-
+    logger = logging.getLogger(f'Strip Confirmer:{number}')
     for miss in missing:
-        profile = get_profile(ACCESS_TOKEN, miss)
+        logger.info('Getting missing tutor with ID %s', miss)
+        profile = api.get_profile_by_id(miss)
 
         hv = profile.get("value")
         hired += hv
 
         owner = profile.get('owner')
 
-        if not owner or not owner['username'].lower() == username.lower():
-            missing_tut_list.append([miss, hv, owner['username']])
+        if not owner or not owner['user_id'] == uid:
+            owner = owner['username'] if owner else 'No one'
+            missing_tut_list.append(
+                [profile['username'], hv, owner])
+        time.sleep(2)
 
     if not missing_tut_list:
         return
@@ -353,12 +249,12 @@ def confirm_strip(missing, username, battle_sts):
 
     if not BATTLE_STATS.get(username):
         t = threading.Thread(target=watch_fls, args=(
-            username, battle_sts), daemon=True)
+            api, username, battle_sts), daemon=True)
 
         t.start()
 
 
-def watch_fls(username, bsts):
+def watch_fls(api, username, bsts):
     """Function ran in thread to repeatedly check if FLs are increasing."""
     if not BATTLE_STATS.get(username):
         BATTLE_STATS[username] = bsts
@@ -366,7 +262,7 @@ def watch_fls(username, bsts):
 
     while True:
 
-        profile = get_profile(ACCESS_TOKEN, username)
+        profile = api.get_profile(username)
 
         fl = profile.get('fights_lost')
         dl = profile.get('steals_lost')
@@ -452,7 +348,7 @@ def alert_server(person, missing=None, added=None, total=None):
 
 def update_allies():
     """Updates the local ally list after every check"""
-    cur = db.cursor()
+    cur = conn.cursor()
     cur.execute("SELECT * FROM allies")
 
     r = cur.fetchall()
@@ -462,15 +358,46 @@ def update_allies():
     ALLIES.extend(r)
 
 
+def start_tasks(chunked_ally_list):
+    """Start threaded tasks to check allies"""
+    # print(allies)
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM tokens')
+
+    tokens = cursor.fetchall()
+    cursor.close()
+    logger = logging.getLogger('ThreadManager')
+
+    index = -1
+    count = 0
+    for ally in chunked_ally_list:
+        logger.info('Starting thread %d', count)
+        index = index + 1 if index < (len(tokens) - 1) else 0
+
+        token = tokens[index]
+        proxy = proxy_manager.at(index)
+        api = API(token, None, proxy=proxy, number=count)
+        t = threading.Thread(target=check_tuts, args=(
+            api, ally, count), daemon=True)
+        t.start()
+        count += 1
+
+
 if __name__ == "__main__":
     try:
         print('Starting tutor checker.')
         setup_db()
         while not STOP:
             print('Checking tutors.')
-            check_tuts()
+
             update_allies()
-            time.sleep(10 * 60)
+            # chunk allies into 10 per set
+            chunked_allies = list(chunks(ALLIES, 10))
+            # start all the threads
+            start_tasks(chunked_allies)
+            # update ally list incase new allies were added during checking
+
+            time.sleep(12 * 60)
     except KeyboardInterrupt:
         STOP = True
         print('Exiting...')

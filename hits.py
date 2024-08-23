@@ -21,6 +21,8 @@
 # SOFTWARE.
 """Script to calculate cash loss and left based on cash hired and guessed percentage took."""
 from argparse import ArgumentParser
+from utils.utils import convert_to_human
+
 
 parser = ArgumentParser(
     description="Calcuates total cash taken based on total tut value hired,"
@@ -39,24 +41,6 @@ def calculate(t, hits, per):
         t -= loss
         history.append((t, loss))
     return (lost, t)
-
-
-def convert_to_human(i: int):
-    """Converts given long numbers into human readable"""
-
-    if i >= 1_000_000_000_000:
-        temp = i / 1_000_000_000_000
-        return f"{temp:.2f}T"
-    if i >= 1_000_000_000:
-        temp = i / 1_000_000_000
-        return f"{temp:.2f}B"
-    if i >= 1_000_000:
-        temp = i / 1_000_000
-        return f"{temp:.2f}M"
-    if i >= 1000:
-        temp = i / 1000
-        return f"{temp:.2f}K"
-    return i
 
 
 def calc(t, hits, per, show_history):
@@ -80,7 +64,10 @@ parser.add_argument('-H', '--history', required=False, action='store_true',
 res = parser.parse_args()
 total = res.total.lower()
 
-if total.endswith('t'):
+if total.endswith('q'):
+    total = total.replace('q', '')
+    total = float(total) * 1_000_000_000_000_000
+elif total.endswith('t'):
     total = total.replace('t', '')
     total = float(total) * 1_000_000_000_000
 elif total.endswith('b'):
