@@ -42,7 +42,6 @@ parser.add_argument('-l', '--list',
 parser.add_argument('-u', '--username',
                     help="The username(s) to add", nargs=argparse.REMAINDER)
 args = parser.parse_args()
-print(args.username)
 if not args.list and not args.username:
     print("No arguments supplied.")
     parser.print_help()
@@ -85,7 +84,7 @@ if __name__ == "__main__":
 
         profile = api.get_profile(username)
         uid = profile['user_id']
-
+        username = profile['username']
         cur = conn.cursor()
         cur.execute(
             'INSERT INTO allies (username, profile_id) VALUES (?, ?)', (username, uid))

@@ -16,3 +16,4 @@ data
 *.gpg
 venv
 __pycache__
+.env

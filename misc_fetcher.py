@@ -43,6 +43,8 @@ parser.add_argument('-s', '--stacks',
                     action="store_true", help="If you want stacks to be saved to file.")
 parser.add_argument('-c', '--count',
                     type=int, default=2, help="What count of misc is cut to be included in stacks")
+parser.add_argument('-S', '--shell',
+                    help="Is this used as a shell command", default=False, action="store_true")
 parser.add_argument('-u', '--username',
                     help="The username to serach", nargs=argparse.REMAINDER)
 
@@ -188,14 +190,14 @@ if __name__ == "__main__":
     try:
         profile = api.get_profile(username)
     except UsernameNotFound:
-        logger.warning('Username not found, exiting.')
-        sys.exit(5)
+        print('Username not found.')
+        sys.exit(0)
 
     showcase = profile.get('showcase')
 
     if not showcase:
-        logger.error('No showcase present in profile?')
-        sys.exit(5)
+        print('No showcase present in profile.')
+        sys.exit(0)
 
     tech_tree = build_techtree()
     att, defen, att_per, defen_per, = calculate(showcase, tech_tree)
@@ -206,5 +208,8 @@ if __name__ == "__main__":
         att = convert_to_human(att)
         defen = convert_to_human(defen)
         total = convert_to_human(total)
-    t.add_row([att, defen, f"{total}cs", f"{att_per}%", f"{defen_per}%"])
-    print(t)
+    if not args.shell:
+        t.add_row([att, defen, f"{total}cs", f"{att_per}%", f"{defen_per}%"])
+        print(t)
+    else:
+        print(json.dumps({"attack": att, "defence": defen, "total": total}))
