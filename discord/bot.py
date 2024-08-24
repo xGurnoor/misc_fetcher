@@ -3,6 +3,7 @@
 # import platform
 import asyncio
 import functools
+import json
 import pathlib
 import sys
 import os
@@ -64,7 +65,7 @@ async def hello(interaction: discord.Interaction):
 @bot.tree.command()
 @app_commands.describe(username="The PIMD username who's misc you wanted to see")
 async def misc(interaction: discord.Interaction, username: str):
-    """Calculates misc and returns"""
+    """Calculates misc and returns it"""
 
     loop = asyncio.get_event_loop()
     await interaction.response.defer()
@@ -143,7 +144,7 @@ async def list_allies(interaction: discord.Interaction):
 
     path = pathlib.Path(os.getcwd()) / '..'
     python = path / 'venv' / 'bin' / 'python3'
-    cmd = [python, 'add_ally.py', '-l']
+    cmd = [python, 'add_ally.py', '-Hl']
 
     await interaction.response.defer()
 
@@ -156,6 +157,9 @@ async def list_allies(interaction: discord.Interaction):
         print(e)
         return await interaction.followup.send('An error occurred.')
 
-    await interaction.followup.send(f"```\n{c.stdout}```")
+    ally_list = json.loads(c.stdout.replace("'", '"'))
+    ally_list = ', '.join(ally_list)
+
+    await interaction.followup.send(f"```\n{ally_list}```")
 
 bot.run(DISCORD_TOKEN)
