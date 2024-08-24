@@ -134,4 +134,28 @@ async def add_ally(interaction: discord.Interaction, ally: str):
 
     await interaction.followup.send(f"```\n{c.stdout}```")
 
+
+@bot.tree.command()
+async def list_allies(interaction: discord.Interaction):
+    """Lists allies present in the database"""
+
+    loop = asyncio.get_event_loop()
+
+    path = pathlib.Path(os.getcwd()) / '..'
+    python = path / 'venv' / 'bin' / 'python3'
+    cmd = [python, 'add_ally.py', '-l']
+
+    await interaction.response.defer()
+
+    try:
+        c = await loop.run_in_executor(None, functools.partial(subprocess.run, cmd,
+                                                               capture_output=True, encoding='utf-8', cwd=path))
+
+    # pylint: disable=broad-exception-caught
+    except Exception as e:
+        print(e)
+        return await interaction.followup.send('An error occurred.')
+
+    await interaction.followup.send(f"```\n{c.stdout}```")
+
 bot.run(DISCORD_TOKEN)
