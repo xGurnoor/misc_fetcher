@@ -39,6 +39,8 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument('-l', '--list',
                     help="List all the added allies", default=False, action="store_true")
+parser.add_argument('-H', '--headless',
+                    help="Run program as headless", default=False, action="store_true")
 parser.add_argument('-u', '--username',
                     help="The username(s) to add", nargs=argparse.REMAINDER)
 args = parser.parse_args()
@@ -73,10 +75,18 @@ if __name__ == "__main__":
 
         cur.close()
 
-        for ally in r:
-            t.add_row([ally['username'], ally['profile_id']])
+        allies = []
 
-        print(t)
+        for ally in r:
+
+            a = [ally['username'], ally['profile_id']]
+            allies.append(f"{a[0]}")
+
+            t.add_row(a)
+        if args.headless:
+            print(allies)
+        else:
+            print(t)
     if not args.username:
         sys.exit()
 
