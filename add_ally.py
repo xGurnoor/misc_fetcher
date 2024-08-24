@@ -59,7 +59,7 @@ cur.close()
 with open('proxylist.txt', 'r', encoding='utf-8') as fp:
     proxy_manager = ProxyManager(fp)
 
-api = API(data, conn, proxy=proxy_manager.get())
+api = API(data, conn, proxy=proxy_manager.get(), proxy_manager=proxy_manager)
 
 if __name__ == "__main__":
     if args.list:

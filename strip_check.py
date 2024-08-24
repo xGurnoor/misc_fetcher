@@ -376,7 +376,8 @@ def start_tasks(chunked_ally_list):
 
         token = tokens[index]
         proxy = proxy_manager.at(index)
-        api = API(token, None, proxy=proxy, number=count)
+        api = API(token, None, proxy=proxy,
+                  proxy_manager=proxy_manager, number=count)
         t = threading.Thread(target=check_tuts, args=(
             api, ally, count), daemon=True)
         t.start()
@@ -390,15 +391,20 @@ if __name__ == "__main__":
         while not STOP:
             print('Checking tutors.')
 
+            # update ally list incase new allies were added during checking
             update_allies()
+
             # chunk allies into 10 per set
             chunked_allies = list(chunks(ALLIES, 10))
+
             # start all the threads
             start_tasks(chunked_allies)
-            # update ally list incase new allies were added during checking
 
-            time.sleep(12 * 60)
+            # sleep for 10 minutes, pin time is 10 miuntes so most strips should still be caught early
+            time.sleep(10 * 60)
+
     except KeyboardInterrupt:
+
         STOP = True
         print('Exiting...')
         sys.exit(0)

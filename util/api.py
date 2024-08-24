@@ -41,12 +41,13 @@ class CantGetToken(Exception):
 class API:
     """Class to handle PIMD login API"""
 
-    def __init__(self, data: Row, database, proxy, number=0) -> None:
+    def __init__(self, data: Row, database, proxy, proxy_manager, number=0) -> None:
 
         self.data = data
         self.exception_counter = 0
         self.db = database
         self.proxy = proxy
+        self.proxy_manager = proxy_manager
         self.logger = logging.getLogger(f'Login API:{number}')
 
     def get_profile(self, profile_name, token=None):
@@ -58,7 +59,7 @@ class API:
         else:
             t = self.data.access_token
         self.logger.debug('Fetching with name: %s', profile_name)
-        r = requests.post(url, data={"profile_username": profile_name}, timeout=400, headers={
+        r = requests.post(url, data={"profile_username": profile_name}, timeout=10, headers={
             "Authorization": f"Bearer {t}", "user-agent": "pimddroid/526"},
             proxies=self.proxy
         )
@@ -102,7 +103,7 @@ class API:
 
         self.logger.debug('Fetching with ID: %s', profile_id)
 
-        r = requests.post(url, data={"profile_user_id": profile_id}, timeout=400, headers={
+        r = requests.post(url, data={"profile_user_id": profile_id}, timeout=10, headers={
             "Authorization": f"Bearer {t}", "user-agent": "pimddroid/526"}, proxies=self.proxy)
 
         res = r.json()
@@ -158,7 +159,7 @@ class API:
             "grant_type": "refresh_token",
             "client_information": self.data.client_info
         }
-        r = requests.post(url, payload, timeout=400,
+        r = requests.post(url, payload, timeout=10,
                           proxies=self.proxy)
         t = r.json()
         if "access_token" not in t:

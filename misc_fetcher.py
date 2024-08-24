@@ -76,7 +76,7 @@ tcur.execute('SELECT * FROM tokens')
 data = tcur.fetchone()
 tcur.close()
 
-api = API(data, db, proxy=proxy_manager.get())
+api = API(data, db, proxy=proxy_manager.get(), proxy_manager=proxy_manager)
 
 db.execute(
     'CREATE TABLE IF NOT EXISTS tokens(access_token TEXT, refresh_token TEXT, client_info TEXT)')

@@ -34,6 +34,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 PROXY_DOWNLOAD_URL = os.getenv('PROXY_DOWNLOAD_URL')
+PROXY_DSIABLED = True if os.getenv(
+    'PROXY_DISABLED').lower() == "true" else False
 
 DummyRow = namedtuple(
     'DummyRow', ('access_token', 'refresh_token', 'client_info'))
@@ -75,15 +77,19 @@ class ProxyManager:
     def __init__(self, fp_or_path) -> None:
         self.proxies = []
         self.last = -1
+        self.disabled = PROXY_DSIABLED
 
         self.setup(fp_or_path)
 
     def setup(self, fp_or_path):
         """Setups the proxy list"""
+
         if isinstance(fp_or_path, str):
             fp = open(fp_or_path, 'r', encoding='utf-8')
+
         elif isinstance(fp_or_path, io.TextIOWrapper):
             fp = fp_or_path
+
         else:
             raise InvalidPathOrFp
 
@@ -95,6 +101,10 @@ class ProxyManager:
 
     def get(self, with_dict=True):
         """Function to get a proxy"""
+
+        if self.disabled:
+            return None
+
         self.last = index = self.last + \
             1 if self.last < (len(self.proxies) - 1) else 0
 
@@ -110,6 +120,9 @@ class ProxyManager:
 
     def at(self, index: int, with_dict=True):
         """Get proxy at given index"""
+        if self.disabled:
+            return None
+
         if index >= len(self.proxies) or index < 0:
             raise IndexError('list index out of range')
 
@@ -118,7 +131,7 @@ class ProxyManager:
         if with_dict:
             return {"https": proxy, "http": proxy}
 
-        return proxy
+        return None
 
     def refetch(self):
         """Refetch all the proxies"""
@@ -130,6 +143,29 @@ class ProxyManager:
 
         with open('proxylist.txt', 'r', encoding='utf-8') as fp:
             self.setup(fp)
+
+    def recheck(self):
+        """Rechecks all proxies"""
+        print('Rechecking proxies...')
+        with open('proxylist.txt', 'r', encoding='utf-8') as fp:
+            proxies = fp.readlines()
+
+        working = []
+
+        for proxy in proxies:
+            try:
+                c = requests.get("https://api.partyinmydorm.com/",
+                                 timeout=15, proxies={"https": f"http://{proxy}"})
+            except requests.exceptions.ProxyError:
+                continue
+
+            if c.text == "Page not found":
+                working.append(proxy)
+                continue
+
+            print(c.text)
+        with open('working_proxy.txt', 'w', encoding='utf-8') as fp:
+            fp.write('\n'.join(working))
 
 
 class Row(sqlite3.Row):
