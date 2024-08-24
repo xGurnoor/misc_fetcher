@@ -19,7 +19,8 @@ from discord.ext import commands
 load_dotenv()
 
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
-MY_GUILD = discord.Object(id=396357106216861708)  # replace with your guild id
+GUILD_ID = os.getenv('DISCORD_GUILD_ID')
+MY_GUILD = discord.Object(id=int(GUILD_ID))  # replace with your guild id
 
 if not DISCORD_TOKEN:
     print('No discord token in environment')
