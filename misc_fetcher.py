@@ -29,8 +29,8 @@ import argparse
 
 
 from prettytable import PrettyTable
-from utils.utils import Row, convert_to_human, ProxyManager
-from utils.api import API, UsernameNotFound
+from util.utils import Row, convert_to_human, ProxyManager
+from util.api import API, UsernameNotFound
 
 parser = argparse.ArgumentParser(
     description='Gets and calculated misc of given username',

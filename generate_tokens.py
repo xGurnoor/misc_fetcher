@@ -9,7 +9,7 @@ import json
 from prettytable import PrettyTable
 import requests
 
-from utils.utils import ProxyManager
+from util.utils import ProxyManager
 
 
 with open("proxylist.txt", 'r', encoding='utf-8') as fp:

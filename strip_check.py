@@ -35,8 +35,8 @@ import sqlite3
 from discord import Embed, SyncWebhook, Color
 from collections import namedtuple
 
-from utils.api import API
-from utils.utils import convert_to_human, ProxyManager, Row
+from util.api import API
+from util.utils import convert_to_human, ProxyManager, Row
 
 # logging.basicConfig(level=logging.INFO)
 parser = argparse.ArgumentParser(

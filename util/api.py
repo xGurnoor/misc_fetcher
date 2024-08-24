@@ -27,7 +27,7 @@ import logging
 import time
 import requests
 
-from utils.utils import Row
+from util.utils import Row
 
 
 class UsernameNotFound(Exception):

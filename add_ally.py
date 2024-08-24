@@ -27,8 +27,8 @@ import argparse
 
 from prettytable.colortable import ColorTable, Themes
 
-from utils.utils import ProxyManager, Row
-from utils.api import API
+from util.utils import ProxyManager, Row
+from util.api import API
 
 
 parser = argparse.ArgumentParser(

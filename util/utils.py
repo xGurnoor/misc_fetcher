@@ -25,12 +25,22 @@ from collections import namedtuple
 
 import sqlite3
 import typing
+import os
+import io
 
 import requests
 
+from dotenv import load_dotenv
+
+load_dotenv()
+PROXY_DOWNLOAD_URL = os.getenv('PROXY_DOWNLOAD_URL')
 
 DummyRow = namedtuple(
     'DummyRow', ('access_token', 'refresh_token', 'client_info'))
+
+
+class InvalidPathOrFp(Exception):
+    """Invalid path or FP provided"""
 
 
 def convert_to_human(i: int):
@@ -62,23 +72,29 @@ def convert_to_human(i: int):
 class ProxyManager:
     """Class to manage proxies"""
 
-    def __init__(self, fp) -> None:
+    def __init__(self, fp_or_path) -> None:
         self.proxies = []
         self.last = -1
 
-        self.setup(fp)
+        self.setup(fp_or_path)
 
-    def setup(self, fp):
+    def setup(self, fp_or_path):
         """Setups the proxy list"""
+        if isinstance(fp_or_path, str):
+            fp = open(fp_or_path, 'r', encoding='utf-8')
+        elif isinstance(fp_or_path, io.TextIOWrapper):
+            fp = fp_or_path
+        else:
+            raise InvalidPathOrFp
+
         proxylist = fp.read().splitlines()
+        fp.close()
 
         for x in proxylist:
-            t = x.split(':')
-            self.proxies.append(f"http://{t[2]}:{t[3]}@{t[0]}:{t[1]}")
+            self.proxies.append(f"http://{x}")
 
     def get(self, with_dict=True):
         """Function to get a proxy"""
-
         self.last = index = self.last + \
             1 if self.last < (len(self.proxies) - 1) else 0
 
@@ -107,7 +123,7 @@ class ProxyManager:
     def refetch(self):
         """Refetch all the proxies"""
         r = requests.get(
-            "https://proxy.webshare.io/api/v2/proxy/list/download/ohtkcmhmbakegrydtnlrhjgawekqskazxpuvmyoj/-/any/username/direct/-/", timeout=10)
+            PROXY_DOWNLOAD_URL, timeout=10)
 
         with open('proxylist.txt', 'w', encoding='utf-8') as fp:
             fp.write(r.text)

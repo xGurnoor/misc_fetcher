@@ -21,7 +21,7 @@
 # SOFTWARE.
 """Script to calculate cash loss and left based on cash hired and guessed percentage took."""
 from argparse import ArgumentParser
-from utils.utils import convert_to_human
+from util.utils import convert_to_human
 
 
 parser = ArgumentParser(
