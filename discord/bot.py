@@ -82,7 +82,7 @@ async def misc(interaction: discord.Interaction, username: str):
         print(e)
         return await interaction.followup.send('An error occurred.')
 
-    await interaction.followup.send(f"```\n{c.stdout}```")
+    await interaction.followup.send(f"{username}\n```\n{c.stdout}```")
 
 
 @bot.tree.command()
