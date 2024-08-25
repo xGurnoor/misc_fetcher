@@ -143,10 +143,11 @@ def update_username(db, name, uid):
     cur.close()
 
 
-def alert_mame_change(old, new):
+def alert_mame_change(old, new, count=1):
     """Alerts the server about a new name change"""
     wh = SyncWebhook.from_url(WEBHOOK_URL)
-    wh.send(f"Ally changed name from `{old}` to `{new}`.")
+    wb_user = f"Strip checking slave #{count}"
+    wh.send(f"Ally changed name from `{old}` to `{new}`.", username=wb_user)
 
 
 def check_tuts(api, allies, num):
@@ -264,16 +265,16 @@ def confirm_strip(api, missing, username, uid, battle_sts, number):
     if not missing_tut_list:
         return
 
-    alert_server(username, missing=missing_tut_list, total=hired)
+    alert_server(username, missing=missing_tut_list, total=hired, count=number)
 
     if not BATTLE_STATS.get(username):
         t = threading.Thread(target=watch_fls, args=(
-            api, username, battle_sts), daemon=True)
+            api, username, battle_sts, number), daemon=True)
 
         t.start()
 
 
-def watch_fls(api, username, bsts):
+def watch_fls(api, username, bsts, count):
     """Function ran in thread to repeatedly check if FLs are increasing."""
 
     if not BATTLE_STATS.get(username):
@@ -290,7 +291,7 @@ def watch_fls(api, username, bsts):
             STOP_WATCHING.remove(username.lower())
             lock.release()
 
-            alert_fls(username, interrupted=True)
+            alert_fls(username, interrupted=True, count=count)
 
             return
 
@@ -305,7 +306,7 @@ def watch_fls(api, username, bsts):
 
         if not fl == bsts.fl or not dl == bsts.dl:
 
-            alert_fls(username, new_bsts, bsts)
+            alert_fls(username, new_bsts, bsts, count=count)
 
             bsts = new_bsts
             unchanged = 0
@@ -314,27 +315,29 @@ def watch_fls(api, username, bsts):
 
             if unchanged >= 5:
 
-                alert_fls(username, stopping=True)
+                alert_fls(username, stopping=True, count=count)
 
                 del BATTLE_STATS[username]
                 break
 
-            alert_fls(username, nochange=True)
+            alert_fls(username, nochange=True, count=count)
             unchanged += 1
 
 
 
-def alert_fls(username, new_stats=None, prev_stats=None, nochange=False, stopping=False, interrupted=False):
+def alert_fls(username, new_stats=None, prev_stats=None, nochange=False, stopping=False, interrupted=False, count=1):
     """Alerts the server about any battle stats changes on potentianl strip"""
     wh = SyncWebhook.from_url(WEBHOOK_URL)
+    wb_user = f"Strip checking slave #{count}"
+
     if nochange:
-        return wh.send(f"No change in battle losses for `{username}`")
+        return wh.send(f"No change in battle losses for `{username}`", username=wb_user)
 
     if stopping:
         return wh.send("No change in battle losses for"
-                       f"`{username}` in 5 consecutive checks, stopped checking.")
+                       f"`{username}` in 5 consecutive checks, stopped checking.", username=wb_user)
     if interrupted:
-        return wh.send(f"Interrupted while watching {username} battle losses. Stopped watching.")
+        return wh.send(f"Interrupted while watching {username} battle losses. Stopped watching.", username=wb_user)
 
     initial = BATTLE_STATS[username]
 
@@ -354,10 +357,10 @@ def alert_fls(username, new_stats=None, prev_stats=None, nochange=False, stoppin
     embed.add_field(name="Initial stats",
                     value=f"FL: {initial.fl} DL: {initial.dl}")
 
-    wh.send(content="<@&1273745059015036938>", embed=embed)
+    wh.send(content="<@&1273745059015036938>", embed=embed, username=wb_user)
 
 
-def alert_server(person, missing=None, added=None, total=None):
+def alert_server(person, missing=None, added=None, total=None, count=1):
     """Inform the server of someone missing a tutor in tutor list."""
     embed = Embed(title="Strip alert",
                   description=f"{person} was potentially stripped.", color=Color.blurple())
@@ -380,8 +383,9 @@ def alert_server(person, missing=None, added=None, total=None):
                         value=", ".join(added), inline=False)
 
     wh = SyncWebhook.from_url(WEBHOOK_URL)
+    wb_user = f"Strip checking slave #{count}"
 
-    wh.send(content="<@&1273744969978613772>", embed=embed)
+    wh.send(content="<@&1273744969978613772>", embed=embed, username=wb_user)
 
 
 def update_allies():
