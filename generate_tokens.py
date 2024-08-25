@@ -1,6 +1,5 @@
 """Module for generating more tokens"""
 
-# DOESNT WORK ?
 import time
 import random
 import uuid
