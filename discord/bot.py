@@ -162,4 +162,32 @@ async def list_allies(interaction: discord.Interaction):
 
     await interaction.followup.send(f"```\n{ally_list}```")
 
+@bot.tree.command()
+@app_commands.describe(ally="Comma seperated list of allies to add.")
+async def stop_watching(interaction: discord.Interaction, ally: str):
+    """Stops the bot from watching given username(s)"""
+
+    loop = asyncio.get_event_loop()
+    allies = [x.strip() for x in ally.split(',')]
+
+    path = pathlib.Path(os.getcwd()) / '..'
+
+    python = path / 'venv' / 'bin' / 'python3'
+
+    cmd = [python, 'stop_watching.py', '-u']
+    cmd.extend(allies)
+
+    await interaction.response.defer()
+
+    try:
+        c = await loop.run_in_executor(None, functools.partial(subprocess.run, cmd,
+                                                               capture_output=True, encoding='utf-8', cwd=path))
+
+    # pylint: disable=broad-exception-caught
+    except Exception as e:
+        print(e)
+        return await interaction.followup.send('An error occurred.')
+
+    await interaction.followup.send(f"```\n{c.stdout}```")
+
 bot.run(DISCORD_TOKEN)

@@ -30,13 +30,18 @@ import time
 import threading
 import logging
 import sqlite3
+import signal
 
 # pylint: disable=wrong-import-order
 from discord import Embed, SyncWebhook, Color
 from collections import namedtuple
+from setproctitle import setproctitle
 
 from util.api import API
 from util.utils import convert_to_human, ProxyManager, Row
+
+# change process name to accomodate using pidof to get pid of this process
+setproctitle('stripper')
 
 # logging.basicConfig(level=logging.INFO)
 parser = argparse.ArgumentParser(
@@ -71,15 +76,29 @@ STOP = False
 WATCH_LIST = []
 BATTLE_STATS = {}
 ALLIES = []
+STOP_WATCHING = []
+
+lock = threading.Lock()
 
 conn = sqlite3.connect('data/stats.db')
 conn.row_factory = Row
 
-# add logic to scale this
-# api = API(tokens, db, proxy_manager.get())
+if not os.path.exists('data'):
+    os.mkdir('data')
 
 BattleStats = namedtuple('BattleStats', ['fl', 'dl', 'pl', 'el'])
 
+def handle_signal(_sig, _frame):
+    """Signal handler function to handle SIGUSR1 signal sent to tell program to check a new addition"""
+
+    with open('data/stop_fls.json', 'r', encoding='utf-8') as file:
+        t = json.load(file)
+
+    lock.acquire(blocking=True, timeout=15)
+    STOP_WATCHING.extend(t)
+    lock.release()
+
+    os.unlink('data/stop_fls.json')
 
 def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
@@ -256,11 +275,24 @@ def confirm_strip(api, missing, username, uid, battle_sts, number):
 
 def watch_fls(api, username, bsts):
     """Function ran in thread to repeatedly check if FLs are increasing."""
+
     if not BATTLE_STATS.get(username):
         BATTLE_STATS[username] = bsts
     unchanged = 0
 
     while True:
+
+        time.sleep(10 * 60)
+
+        if username.lower() in STOP_WATCHING:
+
+            lock.acquire(timeout=15)
+            STOP_WATCHING.remove(username.lower())
+            lock.release()
+
+            alert_fls(username, interrupted=True)
+
+            return
 
         profile = api.get_profile(username)
 
@@ -272,23 +304,27 @@ def watch_fls(api, username, bsts):
         new_bsts = BattleStats(fl, dl, pl, el)
 
         if not fl == bsts.fl or not dl == bsts.dl:
+
             alert_fls(username, new_bsts, bsts)
+
             bsts = new_bsts
             unchanged = 0
 
         else:
 
             if unchanged >= 5:
+
                 alert_fls(username, stopping=True)
+
                 del BATTLE_STATS[username]
                 break
+
             alert_fls(username, nochange=True)
             unchanged += 1
 
-        time.sleep(10 * 60)
 
 
-def alert_fls(username, new_stats=None, prev_stats=None, nochange=False, stopping=False):
+def alert_fls(username, new_stats=None, prev_stats=None, nochange=False, stopping=False, interrupted=False):
     """Alerts the server about any battle stats changes on potentianl strip"""
     wh = SyncWebhook.from_url(WEBHOOK_URL)
     if nochange:
@@ -297,6 +333,8 @@ def alert_fls(username, new_stats=None, prev_stats=None, nochange=False, stoppin
     if stopping:
         return wh.send("No change in battle losses for"
                        f"`{username}` in 5 consecutive checks, stopped checking.")
+    if interrupted:
+        return wh.send(f"Interrupted while watching {username} battle losses. Stopped watching.")
 
     initial = BATTLE_STATS[username]
 
@@ -387,7 +425,10 @@ def start_tasks(chunked_ally_list):
 if __name__ == "__main__":
     try:
         print('Starting tutor checker.')
+
+        signal.signal(signal.SIGUSR1, handle_signal)
         setup_db()
+    
         while not STOP:
             print('Checking tutors.')
 
