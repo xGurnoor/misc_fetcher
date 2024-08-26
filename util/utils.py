@@ -44,31 +44,41 @@ DummyRow = namedtuple(
 class InvalidPathOrFp(Exception):
     """Invalid path or FP provided"""
 
+def truncate(num: float, n: int = 2) -> float:
+    """Truncates float to n decimal precision without rounding off"""
+    return int(num*10**n)/10**n
 
 def convert_to_human(i: int):
     """Converts given long numbers into human readable"""
 
     if i >= 1_000_000_000_000_000:
         temp = i / 1_000_000_000_000_000
-        return f"{temp:.2f}Q"
+        temp = truncate(temp)
+        return f"{temp}Q"
 
     if i >= 1_000_000_000_000:
         temp = i / 1_000_000_000_000
-        return f"{temp:.2f}T"
+        temp = truncate(temp)
+        return f"{temp}T"
 
     if i >= 1_000_000_000:
         temp = i / 1_000_000_000
-        return f"{temp:.2f}B"
+        temp = truncate(temp)
+        return f"{temp}B"
 
     if i >= 1_000_000:
         temp = i / 1_000_000
-        return f"{temp:.2f}M"
+        temp = truncate(temp)
+        return f"{temp}M"
 
     if i >= 1000:
         temp = i / 1000
-        return f"{temp:.2f}K"
+        temp = truncate(temp)
+        return f"{temp}K"
+
 
     return i
+
 
 
 class ProxyManager:

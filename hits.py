@@ -45,14 +45,17 @@ def calculate(t, hits, per):
 
 def calc(t, hits, per, show_history):
     """Wrapper over the calculate function"""
-    s = calculate(t, hits, per)
-    lost = convert_to_human(s[0])
-    left = convert_to_human(s[1])
+
+    lost, left = calculate(t, hits, per)
+    lost = convert_to_human(lost)
+    left = convert_to_human(left)
+
     if show_history:
-        for x in history:
-            t1 = convert_to_human(x[0])
-            loss = convert_to_human(x[1])
-            print(f"Total: ${t1} Lost: ${loss}")
+        for h_total, h_loss in history:
+            h_total = convert_to_human(h_total)
+            h_loss = convert_to_human(h_loss)
+            print(f"Total: ${h_total} Lost: ${h_loss}")
+
     print(f"Lost: ${lost} Left: ${left}")
 
 
@@ -67,15 +70,19 @@ total = res.total.lower()
 if total.endswith('q'):
     total = total.replace('q', '')
     total = float(total) * 1_000_000_000_000_000
+
 elif total.endswith('t'):
     total = total.replace('t', '')
     total = float(total) * 1_000_000_000_000
+
 elif total.endswith('b'):
     total = total.replace('b', '')
     total = float(total) * 1_000_000_000
+
 elif total.endswith('m'):
     total = total.replace('m', '')
     total = float(total) * 1_000_000
+
 elif total.endswith('k'):
     total = total.replace('k', '')
     total = float(total) * 1000
