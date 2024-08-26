@@ -93,7 +93,7 @@ def handle_signal(_sig, _frame):
 
     with open('data/stop_fls.json', 'r', encoding='utf-8') as file:
         t = json.load(file)
-
+    t = [x.lower().strip() for x in t]
     lock.acquire(blocking=True, timeout=15)
     STOP_WATCHING.extend(t)
     lock.release()
