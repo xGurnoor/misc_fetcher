@@ -1,17 +1,18 @@
 """Discord bot for supporting functionality of misc fetcher and strip_checker"""
 
 # import platform
-import asyncio
-import functools
-import json
-import pathlib
-import sys
 import os
+import sys
+import json
+import asyncio
+import pathlib
+import functools
 import subprocess
+
+import sqlite3
 import discord
 
 # pylint: disable=wrong-import-order
-# from typing import Optional
 from dotenv import load_dotenv
 from discord import app_commands
 from discord.ext import commands
@@ -28,7 +29,7 @@ if not DISCORD_TOKEN:
     sys.exit()
 
 # pylint: disable=redefined-outer-name
-
+db = sqlite3.connect('../data/stats.db')
 
 class MyBot(commands.Bot):
     """Main bot class"""
@@ -167,6 +168,16 @@ async def list_allies(interaction: discord.Interaction):
 async def stop_watching(interaction: discord.Interaction, ally: str):
     """Stops the bot from watching given username(s)"""
 
+    await interaction.response.defer()
+
+    cur = db.cursor()
+    res = cur.execute("SELECT * FROM allies WHERE username LIKE '?%'", (ally, ))
+    r = res.fetchone()
+    if not r:
+        return interaction.followup.send(f'`{ally}` is not being watched.')
+
+    ally = r[1]
+
     loop = asyncio.get_event_loop()
     allies = [x.strip() for x in ally.split(',')]
 
@@ -177,7 +188,6 @@ async def stop_watching(interaction: discord.Interaction, ally: str):
     cmd = [python, 'stop_watching.py', '-u']
     cmd.extend(allies)
 
-    await interaction.response.defer()
 
     try:
         c = await loop.run_in_executor(None, functools.partial(subprocess.run, cmd,
@@ -189,5 +199,6 @@ async def stop_watching(interaction: discord.Interaction, ally: str):
         return await interaction.followup.send('An error occurred.')
 
     await interaction.followup.send(f"```\n{c.stdout}```")
+
 
 bot.run(DISCORD_TOKEN)
