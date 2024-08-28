@@ -171,22 +171,22 @@ async def stop_watching(interaction: discord.Interaction, ally: str):
     await interaction.response.defer()
 
     cur = db.cursor()
-    res = cur.execute("SELECT * FROM allies WHERE username LIKE ?", (ally + "%", ))
+    res = cur.execute("SELECT id FROM allies WHERE username LIKE ?", (ally + "%", ))
     r = res.fetchone()
     if not r:
-        return interaction.followup.send(f'`{ally}` is not being watched.')
+        return await interaction.followup.send(f'`{ally}` is not being watched.')
 
-    ally = r[1]
+    ally = r[0]
 
     loop = asyncio.get_event_loop()
-    allies = [x.strip() for x in ally.split(',')]
+    # allies = [x.strip() for x in ally.split(',')]
 
     path = pathlib.Path(os.getcwd()) / '..'
 
     python = path / 'venv' / 'bin' / 'python3'
 
     cmd = [python, 'stop_watching.py', '-u']
-    cmd.extend(allies)
+    cmd.extend(ally)
 
 
     try:
