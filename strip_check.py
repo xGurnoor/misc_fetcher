@@ -93,7 +93,7 @@ def handle_signal(_sig, _frame):
 
     with open('data/stop_fls.json', 'r', encoding='utf-8') as file:
         t = json.load(file)
-    t = [x.lower().strip() for x in t]
+    t = [str(x) for x in t]
     lock.acquire(blocking=True, timeout=15)
     STOP_WATCHING.extend(t)
     lock.release()
@@ -269,33 +269,33 @@ def confirm_strip(api, missing, username, uid, battle_sts, number):
 
     if not BATTLE_STATS.get(username):
         t = threading.Thread(target=watch_fls, args=(
-            api, username, battle_sts, number), daemon=True)
+            api, username, uid, battle_sts, number), daemon=True)
 
         t.start()
 
 
-def watch_fls(api, username, bsts, count):
+def watch_fls(api, username, uid, bsts, count):
     """Function ran in thread to repeatedly check if FLs are increasing."""
-
-    if not BATTLE_STATS.get(username):
-        BATTLE_STATS[username] = bsts
+    uid = str(uid)
+    if not BATTLE_STATS.get(uid):
+        BATTLE_STATS[uid] = bsts
     unchanged = 0
 
     while True:
 
         time.sleep(10 * 60)
 
-        if username.lower() in STOP_WATCHING:
+        if uid in STOP_WATCHING:
 
             lock.acquire(timeout=15)
-            STOP_WATCHING.remove(username.lower())
+            STOP_WATCHING.remove(uid)
             lock.release()
 
-            alert_fls(username, interrupted=True, count=count)
+            alert_fls(username, uid, interrupted=True, count=count)
 
             return
 
-        profile = api.get_profile(username)
+        profile = api.get_profile_by_id(uid)
 
         fl = profile.get('fights_lost')
         dl = profile.get('steals_lost')
@@ -306,7 +306,7 @@ def watch_fls(api, username, bsts, count):
 
         if not fl == bsts.fl or not dl == bsts.dl:
 
-            alert_fls(username, new_bsts, bsts, count=count)
+            alert_fls(username, uid, new_bsts, bsts, count=count)
 
             bsts = new_bsts
             unchanged = 0
@@ -315,17 +315,17 @@ def watch_fls(api, username, bsts, count):
 
             if unchanged >= 5:
 
-                alert_fls(username, stopping=True, count=count)
+                alert_fls(username, uid, stopping=True, count=count)
 
-                del BATTLE_STATS[username]
+                del BATTLE_STATS[uid]
                 break
 
-            alert_fls(username, nochange=True, count=count)
+            alert_fls(username, uid, nochange=True, count=count)
             unchanged += 1
 
 
 
-def alert_fls(username, new_stats=None, prev_stats=None, nochange=False, stopping=False, interrupted=False, count=1):
+def alert_fls(username, uid, new_stats=None, prev_stats=None, nochange=False, stopping=False, interrupted=False, count=1):
     """Alerts the server about any battle stats changes on potentianl strip"""
     wh = SyncWebhook.from_url(WEBHOOK_URL)
     wb_user = f"Strip checking slave #{count}"
@@ -339,7 +339,7 @@ def alert_fls(username, new_stats=None, prev_stats=None, nochange=False, stoppin
     if interrupted:
         return wh.send(f"Interrupted while watching {username} battle losses. Stopped watching.", username=wb_user)
 
-    initial = BATTLE_STATS[username]
+    initial = BATTLE_STATS[uid]
 
     fl_diff = new_stats.fl - prev_stats.fl
     dl_diff = new_stats.dl - prev_stats.dl
