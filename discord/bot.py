@@ -185,7 +185,7 @@ async def stop_watching(interaction: discord.Interaction, ally: str):
 
     python = path / 'venv' / 'bin' / 'python3'
 
-    cmd = [python, 'stop_watching.py', '-u', ally]
+    cmd = [python, 'stop_watching.py', '-u', str(ally)]
 
 
     try:
