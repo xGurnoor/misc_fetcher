@@ -171,12 +171,13 @@ async def stop_watching(interaction: discord.Interaction, ally: str):
     await interaction.response.defer()
 
     cur = db.cursor()
-    res = cur.execute("SELECT id FROM allies WHERE username LIKE ?", (ally + "%", ))
+    res = cur.execute("SELECT id, username FROM allies WHERE username LIKE ?", (ally + "%", ))
     r = res.fetchone()
     if not r:
         return await interaction.followup.send(f'`{ally}` is not being watched.')
 
     ally = r[0]
+    user = r[1]
 
     loop = asyncio.get_event_loop()
     # allies = [x.strip() for x in ally.split(',')]
@@ -189,7 +190,7 @@ async def stop_watching(interaction: discord.Interaction, ally: str):
 
 
     try:
-        c = await loop.run_in_executor(None, functools.partial(subprocess.run, cmd,
+        _ = await loop.run_in_executor(None, functools.partial(subprocess.run, cmd,
                                                                capture_output=True, encoding='utf-8', cwd=path))
 
     # pylint: disable=broad-exception-caught
@@ -197,7 +198,7 @@ async def stop_watching(interaction: discord.Interaction, ally: str):
         print(e)
         return await interaction.followup.send('An error occurred.')
 
-    await interaction.followup.send(f"```\n{c.stdout}```")
+    await interaction.followup.send(f"```\nSignaled strip checker to stop watching {user}.```")
 
 
 bot.run(DISCORD_TOKEN)
