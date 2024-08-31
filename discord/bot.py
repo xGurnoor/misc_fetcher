@@ -171,7 +171,7 @@ async def stop_watching(interaction: discord.Interaction, ally: str):
     await interaction.response.defer()
 
     cur = db.cursor()
-    res = cur.execute("SELECT id, username FROM allies WHERE username LIKE ?", (ally + "%", ))
+    res = cur.execute("SELECT profile_id, username FROM allies WHERE username LIKE ?", (ally + "%", ))
     r = res.fetchone()
     if not r:
         return await interaction.followup.send(f'`{ally}` is not being watched.')

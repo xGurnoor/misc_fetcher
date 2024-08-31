@@ -94,9 +94,11 @@ def handle_signal(_sig, _frame):
     with open('data/stop_fls.json', 'r', encoding='utf-8') as file:
         t = json.load(file)
     t = [str(x) for x in t]
+
     lock.acquire(blocking=True, timeout=15)
     STOP_WATCHING.extend(t)
     lock.release()
+    print("got signal: ", STOP_WATCHING)
 
     os.unlink('data/stop_fls.json')
 
@@ -147,15 +149,13 @@ def alert_mame_change(old, new, count=1):
     """Alerts the server about a new name change"""
     wh = SyncWebhook.from_url(WEBHOOK_URL)
     wb_user = f"Strip checking slave #{count}"
-    wh.send(f"Ally changed name from `{old}` to `{new}`.", username=wb_user)
+    wh.send(f"Ally changed nam from `{old}` to `{new}`.", username=wb_user)
 
 
 def check_tuts(api, allies, num):
-    """Checks the tutors for strips for all allies."""
-
+    """Checks the tutors for strips for all allies.""" 
     db = sqlite3.connect('data/stats.db')
     db.row_factory = Row
-    api.db = db
 
     logger = logging.getLogger(f'Stripper:{num}')
     for ally in allies:

@@ -25,6 +25,7 @@
 import sys
 import logging
 import time
+import sqlite3
 import requests
 
 from util.utils import Row
@@ -41,11 +42,15 @@ class CantGetToken(Exception):
 class API:
     """Class to handle PIMD login API"""
 
-    def __init__(self, data: Row, database, proxy, proxy_manager, number=0) -> None:
+    def __init__(self, data: Row, _database=None, proxy=None, proxy_manager=None, number=0) -> None:
 
         self.data = data
         self.exception_counter = 0
-        self.db = database
+
+        # overriden because DB object cannot be sued from a different thread
+        self.db = sqlite3.connect('data/stats.db')
+        self.db.row_factory = Row
+        
         self.proxy = proxy
         self.proxy_manager = proxy_manager
         self.logger = logging.getLogger(f'Login API:{number}')

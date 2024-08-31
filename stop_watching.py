@@ -19,14 +19,14 @@ parser = argparse.ArgumentParser(
 )
 
 parser.add_argument('-u', '--username',
-                    help='Username of the ally to stop watching FLs of', nargs=argparse.REMAINDER, required=True)
+                    help='Username of the ally to stop watching FLs of', nargs=argparse.REMAINDER, type=int, required=True)
 
 args = parser.parse_args()
+u = [str(x) for x in args.username]
 
 with open('data/stop_fls.json', 'w', encoding='utf-8') as fp:
-    json.dump(args.username, fp)
+    json.dump(u, fp)
 
 os.kill(PID, signal.SIGUSR1)
-
-USERS = ', '.join(args.username)
+USERS = ', '.join(u)
 print(f'Signaled strip checker to stop watching {USERS}.')
