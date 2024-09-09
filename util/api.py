@@ -58,6 +58,8 @@ class API:
     def get_profile(self, profile_name, token=None):
         """Gets the profile data by username"""
         url = "https://api.partyinmydorm.com/game/user/get_profile_by_username/"
+        self.db = sqlite3.connect('data/stats.db')
+        self.db.row_factory = Row
 
         if token:
             t = token
@@ -100,6 +102,9 @@ class API:
     def get_profile_by_id(self, profile_id, token=None):
         """Gets the profile data by ID"""
         url = "https://api.partyinmydorm.com/game/user/get_profile/"
+
+        self.db = sqlite3.connect('data/stats.db')
+        self.db.row_factory = Row
 
         if token:
             t = token
