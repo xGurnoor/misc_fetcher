@@ -63,9 +63,11 @@ async def hello(interaction: discord.Interaction):
     await interaction.response.send_message(f'Hi, {interaction.user.mention}')
 
 
-@bot.tree.command()
+group = app_commands.Group(name="misc", description="Fetch misc of given username")
+
+@group.command()
 @app_commands.describe(username="The PIMD username who's misc you wanted to see")
-async def misc(interaction: discord.Interaction, username: str):
+async def user(interaction: discord.Interaction, username: str):
     """Calculates misc and returns it"""
 
     loop = asyncio.get_event_loop()
@@ -83,8 +85,17 @@ async def misc(interaction: discord.Interaction, username: str):
         print(e)
         return await interaction.followup.send('An error occurred.')
 
+    
     await interaction.followup.send(f"{username}\n```\n{c.stdout}```")
 
+@group.command()
+@app_commands.describe(rs='Username of the RS of the person you want the misc of')
+async def rs(interaction: discord.Interaction, rs: str):
+    """Get misc of a user by using their RS as a QL"""
+    await interaction.response.send_message(rs)
+
+
+bot.tree.add_command(group)
 
 @bot.tree.command()
 @app_commands.describe(hits="Total number of hits done", percentage="What percent cash is being taken", total="Total cash taken")
