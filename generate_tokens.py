@@ -1,5 +1,6 @@
 """Module for generating more tokens"""
 
+import os
 import time
 import random
 import uuid
@@ -14,7 +15,10 @@ from util.utils import ProxyManager
 with open("proxylist.txt", 'r', encoding='utf-8') as fp:
     proxy_manager = ProxyManager(fp)
 
-WORD_FILE = "/usr/share/dict/words"
+WORD_FILE = "/usr/share/dict/names"
+if not os.path.exists(WORD_FILE):
+    print('/user/share/dict/names does not exist. exiting...')
+    exit(127)
 WORDS = open(WORD_FILE, 'r', encoding='utf-8').read().splitlines()
 
 
