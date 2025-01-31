@@ -152,6 +152,7 @@ def alert_mame_change(old, new, count=1):
     wh.send(f"Ally changed nam from `{old}` to `{new}`.", username=wb_user)
 
 
+# pylint: disable=too-many-branches, too-many-statements, too-many-locals
 def check_tuts(api, allies, num):
     """Checks the tutors for strips for all allies.""" 
     db = sqlite3.connect('data/stats.db')
@@ -234,12 +235,35 @@ def check_tuts(api, allies, num):
                 cur.close()
 
                 if missing:
-
                     confirm_strip(api, missing, username, uid, battle_sts, num)
+
+                if added:
+                    if BATTLE_STATS.get(username):
+                        hired_new(api, added, username, num)
 
         time.sleep(3)
 
+def hired_new(api, added, username, num):
+    """Alerts about newly hired tuts during an active strip."""
+    logger = logging.getLogger(f"Strip Watcher:{num}")
+    logger.info('%s hired new tuts', username)
 
+    hired = 0
+    added_tut_list = []
+
+    for new in added:
+        profile = api.get_profile_by_id(new)
+
+        hv = profile.get('value')
+        hired =+ hv
+
+        added_tut_list.append([profile['username'], hv, profile['owner']])
+
+        time.sleep(0.5)
+
+    alert_server(username, added=added_tut_list, total=hired, count=num)
+
+# pylint: disable=too-many-arguments
 def confirm_strip(api, missing, username, uid, battle_sts, number):
     """Takes in missing tuts and checks who hired to confirm
       they were hired away not buried in the tut list"""
@@ -260,7 +284,7 @@ def confirm_strip(api, missing, username, uid, battle_sts, number):
             owner = owner['username'] if owner else 'No one'
             missing_tut_list.append(
                 [profile['username'], hv, owner])
-        time.sleep(2)
+        time.sleep(0.5)
 
     if not missing_tut_list:
         return
@@ -324,7 +348,7 @@ def watch_fls(api, username, uid, bsts, count):
             unchanged += 1
 
 
-
+# pylint: disable=too-many-arguments, too-many-locals, inconsistent-return-statements
 def alert_fls(username, uid, new_stats=None, prev_stats=None, nochange=False, stopping=False, interrupted=False, count=1):
     """Alerts the server about any battle stats changes on potentianl strip"""
     wh = SyncWebhook.from_url(WEBHOOK_URL)
@@ -361,7 +385,7 @@ def alert_fls(username, uid, new_stats=None, prev_stats=None, nochange=False, st
 
 
 def alert_server(person, missing=None, added=None, total=None, count=1):
-    """Inform the server of someone missing a tutor in tutor list."""
+    """Inform the server of someone missing or hiring a tutor in tutor list."""
     embed = Embed(title="Strip alert",
                   description=f"{person} was potentially stripped.", color=Color.blurple())
     if missing:
@@ -432,7 +456,7 @@ if __name__ == "__main__":
 
         signal.signal(signal.SIGUSR1, handle_signal)
         setup_db()
-    
+
         while not STOP:
             print('Checking tutors.')
 
