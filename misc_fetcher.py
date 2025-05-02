@@ -54,9 +54,6 @@ if not username:
     parser.print_help()
     sys.exit()
 
-with open("tokens.json", 'r', encoding="UTF-8") as f:
-    tokens = json.load(f)
-
 with open('proxylist.txt', 'r', encoding='utf-8') as fp:
 
     proxy_manager = ProxyManager(fp)
@@ -68,7 +65,7 @@ logger = logging.getLogger('Misc Fetcher')
 logging.basicConfig(level=logging.INFO)
 
 db.row_factory = Row
-STACK_LIST = []
+STACK_LIST: list[str] = []
 
 tcur = db.cursor()
 tcur.execute('SELECT * FROM tokens')

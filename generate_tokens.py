@@ -1,23 +1,37 @@
 """Module for generating more tokens"""
 
+from prettytable import PrettyTable
+from util.utils import ProxyManager
+
 import os
 import time
 import random
 import uuid
 import string
 import json
-from prettytable import PrettyTable
 import requests
+import argparse
+import sys
 
-from util.utils import ProxyManager
+parser = argparse.ArgumentParser(
+    description='Adds a token to the ally database',
+    epilog="APIs for the win"
+)
 
+
+parser.add_argument('-n', '--num', default=1,
+                    help="The acccess tokeb")
+
+args = parser.parse_args()
+num_tokens = int(args.num)
+print(f'Generating {num_tokens} tokens')
 
 with open("proxylist.txt", 'r', encoding='utf-8') as fp:
     proxy_manager = ProxyManager(fp)
 
 WORD_FILE = "/usr/share/dict/names"
 if not os.path.exists(WORD_FILE):
-    print('/user/share/dict/names does not exist. exiting...')
+    print('/usr/share/dict/names does not exist. exiting...')
     exit(127)
 WORDS = open(WORD_FILE, 'r', encoding='utf-8').read().splitlines()
 
@@ -161,7 +175,7 @@ def get_payload(ad, a_id, a_sid):
 
 tokens = []
 
-for x in range(7):
+for x in range(num_tokens):
     try:
         res = run()
 
@@ -174,9 +188,10 @@ for x in range(7):
     client_info = json.dumps(client_info)
     tokens.append(f"{refresh}:SPLIT:{client_info}")
 
-with open('tokens.txt', 'w', encoding='utf-8') as fp:
-    LI = "\n".join(tokens)
-    fp.write(LI)
-res = run()
+    with open('tokens.txt', 'w', encoding='utf-8') as fp:
+        LI = "\n".join(tokens)
+        fp.write(LI)
+
+# res = run()
 print('\n\n')
 print(tb)

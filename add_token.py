@@ -51,6 +51,7 @@ conn = sqlite3.connect('data/stats.db')
 
 
 if __name__ == "__main__":
+    conn.execute('CREATE TABLE IF NOT EXISTS tokens (id SERIAL, access_token TEXT, refresh_token TEXT, client_info TEXT)')
     sql = 'INSERT INTO tokens(access_token, refresh_token, client_info) VALUES(?, ?, ?)'
     if not args.file:
         a_token = args.access
@@ -67,7 +68,7 @@ if __name__ == "__main__":
         file = args.file
         with open(file, 'r', encoding='utf-8') as fp:
             l = fp.readlines()
-            args = []
+            args = [] # type: ignore
             for x in l:
                 refresh_token, client_info = x.split(":SPLIT:")
                 client_info = client_info.replace("'", '"')
