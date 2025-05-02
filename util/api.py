@@ -27,9 +27,12 @@ import logging
 import time
 import sqlite3
 import requests
+import os
 
 from util.utils import Row
+from dotenv import load_dotenv
 
+load_dotenv('.env')
 
 class UsernameNotFound(Exception):
     """Error class when usernames are not found."""
@@ -46,11 +49,12 @@ class API:
 
         self.data = data
         self.exception_counter = 0
-
+        self.client_version = os.getenv('PIMD_CLIENT_VERSION')
+        self.game_version = os.getenv('PIMD_GAME_VERSION')
         # overriden because DB object cannot be sued from a different thread
         self.db = sqlite3.connect('data/stats.db')
         self.db.row_factory = Row
-        
+
         self.proxy = proxy
         self.proxy_manager = proxy_manager
         self.logger = logging.getLogger(f'Login API:{number}')
@@ -161,10 +165,10 @@ class API:
         payload = {
             "channel_id": "16",
             "client_id": "ata.squid.pimd",
-            "client_version": "534",
+            "client_version": self.client_version,
             "refresh_token": self.data.refresh_token,
             "scope": "[\"all\"]",
-            "version": "3320",
+            "version": self.game_version,
             "client_secret": "n0ts0s3cr3t",
             "grant_type": "refresh_token",
             "client_information": self.data.client_info
@@ -172,7 +176,7 @@ class API:
         r = requests.post(url, payload, timeout=10,
                           proxies=self.proxy)
         t = r.json()
-        if "access_token" not in t:
+        if not t.get('access_token'):
             print(t)
             raise CantGetToken
         if resp:
