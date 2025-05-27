@@ -22,6 +22,7 @@
 
 """Script to get and calculate misc"""
 import logging
+import os
 import sys
 import json
 import sqlite3
@@ -45,14 +46,21 @@ parser.add_argument('-c', '--count',
                     type=int, default=2, help="What count of misc is cut to be included in stacks")
 parser.add_argument('-S', '--shell',
                     help="Is this used as a shell command", default=False, action="store_true")
+parser.add_argument('-f', '--file',
+                    help="Save fetched profle to a temp file.", action='store_true')
+parser.add_argument('-r', '--relationship',
+                    help="Fetch misc from given user's relationship.", action='store_true')
 parser.add_argument('-u', '--username',
-                    help="The username to serach", nargs=argparse.REMAINDER)
+                    help="The username to search", nargs=argparse.REMAINDER)
 
 args = parser.parse_args()
-username = args.username[0]
-if not username:
+
+if args.username:
+    username = args.username[0]
+
+else:
     parser.print_help()
-    sys.exit()
+    sys.exit(1)
 
 with open('proxylist.txt', 'r', encoding='utf-8') as fp:
 
@@ -186,9 +194,24 @@ if __name__ == "__main__":
 
     try:
         profile = api.get_profile(username)
+        if args.relationship:
+            rs = profile.get('partner_username')
+            if not rs:
+                print(f'Given username ({username}) has no relationsip.')
+                sys.exit(2)
+            username = rs
+            profile = api.get_profile(rs)
+
     except UsernameNotFound:
         print('Username not found.')
         sys.exit(0)
+    
+    if args.file:
+        if not os.path.exists('temp'):
+            os.mkdir('temp')
+        
+        with open('temp/profile.json', 'w') as f:
+            json.dump(profile, f, indent=2)
 
     showcase = profile.get('showcase')
 
@@ -205,8 +228,11 @@ if __name__ == "__main__":
         att = convert_to_human(att)
         defen = convert_to_human(defen)
         total = convert_to_human(total)
+
     if not args.shell:
         t.add_row([att, defen, f"{total}cs", f"{att_per}%", f"{defen_per}%"])
+        print(f'Stats for {username}')
         print(t)
+
     else:
         print(json.dumps({"attack": att, "defence": defen, "total": total}))
