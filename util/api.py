@@ -71,7 +71,7 @@ class API:
         self.proxy = proxy
         
         if test_ip:
-            r = requests.get("https://api.ipify.org?format=json", proxies=self.proxy, timeout=10)
+            r = requests.get("https://api.ipify.org?format=json", proxies=self.proxy, timeout=20)
             ip = r.json()['ip']
             self.logger.info(f'The IP being used: {ip}')
 
@@ -86,7 +86,7 @@ class API:
         else:
             t = self.data.access_token
         self.logger.debug('Fetching with name: %s', profile_name)
-        r = requests.post(url, data={"profile_username": profile_name}, timeout=10, headers={
+        r = requests.post(url, data={"profile_username": profile_name}, timeout=20, headers={
             "Authorization": f"Bearer {t}", "user-agent": "pimddroid/526"},
             proxies=self.proxy
         )
@@ -133,7 +133,7 @@ class API:
 
         self.logger.debug('Fetching with ID: %s', profile_id)
 
-        r = requests.post(url, data={"profile_user_id": profile_id}, timeout=10, headers={
+        r = requests.post(url, data={"profile_user_id": profile_id}, timeout=20, headers={
             "Authorization": f"Bearer {t}", "user-agent": "pimddroid/526"}, proxies=self.proxy)
 
         res = r.json()
@@ -189,7 +189,7 @@ class API:
             "grant_type": "refresh_token",
             "client_information": self.data.client_info
         }
-        r = requests.post(url, payload, timeout=10,
+        r = requests.post(url, payload, timeout=20,
                           proxies=self.proxy)
         t = r.json()
         if not t.get('access_token'):

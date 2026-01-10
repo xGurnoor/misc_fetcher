@@ -63,7 +63,7 @@ def run():
         "version": "3282",
         "client_secret": "n0ts0s3cr3t",
         "grant_type": "urn:athinkingape:temporary:v1",
-    }, timeout=10, proxies=proxy, headers={'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'})
+    }, timeout=20, proxies=proxy, headers={'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'})
 
     refresh_token = r.json()['refresh_token']
 
@@ -100,13 +100,13 @@ def run():
             "client_secret": "n0ts0s3cr3t",
             "grant_type": "refresh_token",
             "client_information": payload["client_information"]
-        }, timeout=10, proxies=proxy)
+        }, timeout=20, proxies=proxy)
 
     track_tutorial("tutorial2-a_1-choose_avatar_screen")
     requests.post("https://api.partyinmydorm.com/game/registration/get_tutorial_avatars/", {
         "max_avatars": 12,
         "start_avatar_variation": 0
-    }, timeout=10, proxies=proxy)
+    }, timeout=20, proxies=proxy)
 
     sleep(2, "chosing avatar")
     track_tutorial("tutorial2-a_2-choose_username_screen")
@@ -117,7 +117,7 @@ def run():
     body.update(package_name="ata.squid.pimd", username=random.choice(WORDS),
                 scope="[]", version_2_return=True)
     r = requests.post("https://api.partyinmydorm.com/game/registration/oauth/create_game_user/",
-                      data=body, timeout=10, proxies=proxy)
+                      data=body, timeout=20, proxies=proxy)
     s = r.json()
     if s.get('exception'):
         print(s)
@@ -149,7 +149,7 @@ def run():
     })
     r = requests.post(
         "https://api.partyinmydorm.com/game/registration/oauth/complete_tutorial/",
-        hds, timeout=10, proxies=proxy, headers={"Content-Type": "application/x-www-form-urlencoded;charset=utf-8"})
+        hds, timeout=20, proxies=proxy, headers={"Content-Type": "application/x-www-form-urlencoded;charset=utf-8"})
     v = r.json()
     if v.get('exception'):
         print(v)
