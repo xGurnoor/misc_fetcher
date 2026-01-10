@@ -12,6 +12,10 @@ import json
 import requests
 import argparse
 import sys
+import dotenv
+
+GAME_VERSION = os.getenv("PIMD_GAME_VERSION")
+CLIENT_VERSION = os.geten("PIMD_CLIENT_VERSION")
 
 parser = argparse.ArgumentParser(
     description='Adds a token to the ally database',
@@ -58,9 +62,9 @@ def run():
     r = requests.post("https://api.partyinmydorm.com/game/login/oauth/", data={
         "channel_id": "16",
         "client_id": "ata.squid.pimd",
-        "client_version": "534",
+        "client_version": CLIENT_VERSION,
         "scope": '["all"]',
-        "version": "3282",
+        "version": GAME_VERSION,
         "client_secret": "n0ts0s3cr3t",
         "grant_type": "urn:athinkingape:temporary:v1",
     }, timeout=20, proxies=proxy, headers={'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8'})
@@ -74,7 +78,7 @@ def run():
     payload = {
         "channel_id": "16",
         "client_id": "ata.squid.pimd",
-        "client_version": "534",
+        "client_version": CLIENT_VERSION,
         "refresh_token": refresh_token,
         "scope": '["all"]',
         "client_secret": "n0ts0s3cr3t",
@@ -145,7 +149,7 @@ def run():
         "uncovered_land3": "4",
         "new_user_experience": True,
         "item_id": "133886",
-        "version": "3320",
+        "version": GAME_VERSION,
     })
     r = requests.post(
         "https://api.partyinmydorm.com/game/registration/oauth/complete_tutorial/",
