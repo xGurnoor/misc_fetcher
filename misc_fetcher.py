@@ -52,6 +52,8 @@ parser.add_argument('-r', '--relationship',
                     help="Fetch misc from given user's relationship.", action='store_true')
 parser.add_argument('-u', '--username',
                     help="The username to search", nargs=argparse.REMAINDER)
+parser.add_argument('-d', '--debug',
+                    help="Enable debug logging", action='store_true')
 
 args = parser.parse_args()
 
@@ -70,7 +72,13 @@ db = sqlite3.connect('data/stats.db')
 techdb = sqlite3.connect('techtree.sqlite')
 
 logger = logging.getLogger('Misc Fetcher')
-logging.basicConfig(level=logging.INFO)
+
+if args.debug:
+    logging.basicConfig(level=logging.DEBUG)   
+    logger.debug('Debug logging enabled')
+    print('Debug logging enabled')
+else:   
+    logging.basicConfig(level=logging.INFO)
 
 db.row_factory = Row
 STACK_LIST: list[str] = []
@@ -91,11 +99,13 @@ def refetch(techtree):
     """Refetches new misc items and add to techtree"""
 
     rsp = api.get_access_token(resp=True)
-
+    logger.debug(f'Fetched new access token: debug_info.json')
+    json.dump(rsp, open('debug_info.json', 'w'), indent=2)
     cur = techdb.cursor()
 
     resp = rsp[0]
     items = resp['new_items']
+    logger.debug(f'New items fetched: {items}') 
 
     for item in items:
         if techtree.get(item['id']):
