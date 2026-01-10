@@ -26,8 +26,8 @@ args = parser.parse_args()
 num_tokens = int(args.num)
 print(f'Generating {num_tokens} tokens')
 
-with open("proxylist.txt", 'r', encoding='utf-8') as fp:
-    proxy_manager = ProxyManager(fp)
+#with open("proxylist.txt", 'r', encoding='utf-8') as fp:
+#    proxy_manager = ProxyManager(fp)
 
 WORD_FILE = "/usr/share/dict/names"
 if not os.path.exists(WORD_FILE):
@@ -46,10 +46,14 @@ def sleep(num, why):
 
 tb = PrettyTable(['token', 'advertising ID', 'android ID', 'app set ID'])
 
+proxy = {}
+https = os.getenv('HTTP_PROXY')
+if https:
+    proxy['https'] = https
 
 def run():
     """main function"""
-    proxy = proxy_manager.get()
+ #   proxy = proxy_manager.get()
 
     r = requests.post("https://api.partyinmydorm.com/game/login/oauth/", data={
         "channel_id": "16",
