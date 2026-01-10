@@ -15,7 +15,7 @@ import sys
 import dotenv
 
 GAME_VERSION = os.getenv("PIMD_GAME_VERSION")
-CLIENT_VERSION = os.geten("PIMD_CLIENT_VERSION")
+CLIENT_VERSION = os.getenv("PIMD_CLIENT_VERSION")
 
 parser = argparse.ArgumentParser(
     description='Adds a token to the ally database',
