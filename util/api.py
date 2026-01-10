@@ -45,19 +45,35 @@ class CantGetToken(Exception):
 class API:
     """Class to handle PIMD login API"""
 
-    def __init__(self, data: Row, _database=None, proxy=None, proxy_manager=None, number=0) -> None:
+    def __init__(self, data: Row, _database=None, proxy=None, proxy_manager=None, number=0, test_ip=False) -> None:
 
         self.data = data
         self.exception_counter = 0
         self.client_version = os.getenv('PIMD_CLIENT_VERSION')
         self.game_version = os.getenv('PIMD_GAME_VERSION')
-        # overriden because DB object cannot be sued from a different thread
+        # overriden because DB object cannot be used from a different thread
         self.db = sqlite3.connect('data/stats.db')
         self.db.row_factory = Row
 
-        self.proxy = proxy
-        self.proxy_manager = proxy_manager
+        #self.proxy = proxy
+        #self.proxy_manager = proxy_manager
         self.logger = logging.getLogger(f'Login API:{number}')
+
+        proxy = {}
+        http_proxy = os.getenv('HTTP_PROXY')
+        https_proxy = os.getenv('HTTPS_PROXY')
+        
+        if http_proxy:
+            proxy['http'] = http_proxy
+        if https_proxy:
+            proxy['https'] = https_proxy
+        
+        self.proxy = proxy
+        
+        if test_ip:
+            r = requests.get("https://api.ipify.org?format=json", proxies=self.proxy, timeout=10)
+            ip = r.json()['ip']
+            self.logger.info(f'The IP being used: {ip}')
 
     def get_profile(self, profile_name, token=None):
         """Gets the profile data by username"""

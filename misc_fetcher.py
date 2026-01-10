@@ -55,6 +55,9 @@ parser.add_argument('-u', '--username',
 parser.add_argument('-d', '--debug',
                     help="Enable debug logging", action='store_true')
 
+parser.add_argument('-t', '--test-ip',
+                    help='Test and show what IP is being used', action='store_true')
+
 args = parser.parse_args()
 
 if args.username:
@@ -89,7 +92,7 @@ tcur.execute('SELECT * FROM tokens')
 data = tcur.fetchone()
 tcur.close()
 
-api = API(data, db, proxy=proxy_manager.get(), proxy_manager=proxy_manager)
+api = API(data, db, proxy=proxy_manager.get(), proxy_manager=proxy_manager, test_ip=args.test_ip)
 
 db.execute(
     'CREATE TABLE IF NOT EXISTS tokens(access_token TEXT, refresh_token TEXT, client_info TEXT)')
