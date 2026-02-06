@@ -149,7 +149,7 @@ def alert_mame_change(old, new, count=1):
     """Alerts the server about a new name change"""
     wh = SyncWebhook.from_url(WEBHOOK_URL)
     wb_user = f"Strip checking slave #{count}"
-    wh.send(f"Ally changed nam from `{old}` to `{new}`.", username=wb_user)
+    wh.send(f"Ally changed name from `{old}` to `{new}`.", username=wb_user)
 
 
 # pylint: disable=too-many-branches, too-many-statements, too-many-locals
