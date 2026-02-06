@@ -131,10 +131,12 @@ def run():
 
     sleep(2*60, "finishing questline")
     track_tutorial("tutorial2-a_15-questline_finished")
+    track_tutorial("tutorial2-a_8-quest")
+
 
     sleep(1, "getting quest result")
     track_tutorial("tutorial2-a_16-quest_result")
-
+    track_tutorial("tutorial2-a_16-collect")
     sleep(60, "loading into the game")
     hds = payload.copy()
     hds.update({
